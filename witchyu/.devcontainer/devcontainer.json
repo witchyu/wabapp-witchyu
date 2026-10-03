@@ -1,0 +1,8 @@
+{
+  "name": "witchyu",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "forwardPorts": [5173],
+  "portsAttributes": { "5173": { "label": "Witchyu App", "onAutoForward": "openBrowser" } },
+  "postCreateCommand": "cd frontend && npm install",
+  "postAttachCommand": "cd frontend && npm run dev"
+}
