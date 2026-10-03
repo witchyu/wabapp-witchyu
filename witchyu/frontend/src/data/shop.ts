@@ -11,5 +11,7 @@ export const SHOP = {
 export const BASE_SLOTS = ['18:00', '19:00', '20:00', '21:00', '22:30']
 export const UNLIMITED_SLOT = '22:30'
 export const BOOKING_DAYS = 7
+export const SLOT_CAPACITY = 1                     // จำนวนคิวสูงสุดต่อรอบเวลา (Phase 4 ให้ Admin กำหนดได้)
+export const PAYMENT_LIMIT_MS = 15 * 60 * 1000     // เวลาที่ถือรอบไว้ระหว่างรอชำระเงิน
 
 export const RELATIONSHIPS = ['โสด', 'มีแฟน', 'คุยอยู่', 'แต่งงานแล้ว', 'ไม่ระบุ']

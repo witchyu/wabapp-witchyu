@@ -10,7 +10,8 @@ import { EmptyState } from '../components/states'
 import PageHeader from '../components/PageHeader'
 import { useBooking } from '../hooks/useBooking'
 import { useToast } from '../hooks/useToast'
-import { getService, selectedServices, selectionTotal } from '../data/services'
+import { getService, selectionTotal } from '../data/services'
+import { validateCustomer, validateSchedule, validateSelection } from '../utils/bookingRules'
 import { SHOP } from '../data/shop'
 
 const TITLES = ['ข้อมูลผู้จอง', 'เลือกบริการ', 'วันและเวลา', 'หมายเหตุ', 'สรุปการจอง']
@@ -19,7 +20,7 @@ export default function Booking() {
   const nav = useNavigate()
   const toast = useToast()
   const [params] = useSearchParams()
-  const { draft, patchDraft, setMulti, resetDraft, setProfile, addBooking } = useBooking()
+  const { draft, patchDraft, setMulti, resetDraft, bookings, createBooking } = useBooking()
   const [step, setStep] = useState(0)
 
   // มาจากหน้า Services/Home พร้อมบริการที่เลือกไว้แล้ว
@@ -38,19 +39,9 @@ export default function Booking() {
   }
 
   const validate = (): string | null => {
-    const c = draft.customer
-    if (step === 0) {
-      if (!c.nickname.trim()) return 'กรุณากรอกชื่อเล่น'
-      if (!c.fullName.trim()) return 'กรุณากรอกชื่อจริง'
-      const age = Number(c.age)
-      if (!c.age || age < 1 || age > 120) return 'กรุณากรอกอายุให้ถูกต้อง'
-      if (!c.relationship) return 'กรุณาเลือกสถานะความสัมพันธ์'
-    }
-    if (step === 1) {
-      if (draft.serviceIds.length === 0) return 'กรุณาเลือกบริการอย่างน้อย 1 รายการ'
-      if (draft.serviceIds.includes('q-custom') && draft.questionCount < 1) return 'กรุณากรอกจำนวนคำถาม'
-    }
-    if (step === 2 && !draft.time) return 'กรุณาเลือกเวลา'
+    if (step === 0) return validateCustomer(draft.customer)
+    if (step === 1) return validateSelection(draft)
+    if (step === 2) return validateSchedule(draft, bookings, Date.now())
     return null
   }
 
@@ -63,23 +54,14 @@ export default function Booking() {
   const back = () => (step === 0 ? nav(-1) : setStep((s) => s - 1))
 
   const confirm = () => {
-    const svcs = selectedServices(draft.serviceIds)
-    if (svcs.length === 0) return toast('ไม่พบบริการที่เลือก', 'error')
-    if (draft.remember) setProfile(draft.customer)
-    const custom = svcs.find((x) => x.perQuestion)
-    const booking = addBooking({
-      serviceId: svcs[0].id,
-      serviceName: svcs.map((x) => x.name).join(', '),
-      questionCount: custom ? draft.questionCount : undefined,
-      price: selectionTotal(draft.serviceIds, draft.questionCount),
-      date: draft.date,
-      time: draft.time,
-      note: draft.note.trim(),
-      customer: draft.customer,
-      isCall: svcs.some((x) => x.group === 'call'),
-    })
+    const result = createBooking()
+    if (!result.ok) {
+      toast(result.error, 'error')
+      setStep(result.step)
+      return
+    }
     resetDraft()
-    nav(`/payment/${booking.id}`, { replace: true })
+    nav(`/payment/${result.booking.id}`, { replace: true })
   }
 
   const last = step === TITLES.length - 1

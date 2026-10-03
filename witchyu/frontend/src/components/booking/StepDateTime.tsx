@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useBooking } from '../../hooks/useBooking'
 import { selectedServices } from '../../data/services'
 import { BOOKING_DAYS } from '../../data/shop'
@@ -8,10 +8,15 @@ import { SLOTS, slotStatus } from '../../utils/slots'
 const LABEL = { available: 'ว่าง', full: 'เต็ม', closed: 'ปิด' } as const
 
 export default function StepDateTime() {
-  const { draft, patchDraft } = useBooking()
+  const { draft, patchDraft, bookings } = useBooking()
   const svc = selectedServices(draft.serviceIds).find((x) => x.unlimited)
   const days = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(), i))), [])
   const today = days[0]
+
+  // ถ้ารอบที่เลือกค้างไว้เต็ม/ปิดไปแล้ว (เช่น เปลี่ยนบริการ หรือมีคนจองตัด) ให้เลือกใหม่
+  useEffect(() => {
+    if (draft.time && slotStatus(bookings, draft.date, draft.time, svc) !== 'available') patchDraft({ time: '' })
+  }, [bookings, draft.date, draft.time, svc, patchDraft])
 
   return (
     <div>
@@ -29,7 +34,7 @@ export default function StepDateTime() {
       {svc?.unlimited && <p className="mb-3 rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">บริการโทรไม่จำกัด จองได้เฉพาะรอบ 22:30</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {SLOTS.map((t) => {
-          const st = slotStatus(draft.date, t, svc)
+          const st = slotStatus(bookings, draft.date, t, svc)
           const selected = draft.time === t
           const disabled = st !== 'available'
           return (

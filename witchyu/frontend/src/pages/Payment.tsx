@@ -5,8 +5,7 @@ import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState } from '../components/states'
 import { useBooking } from '../hooks/useBooking'
 import { baht, dateLong, mmss } from '../utils/format'
-
-const LIMIT_SEC = 15 * 60
+import { PAYMENT_LIMIT_MS } from '../data/shop'
 
 // QR จำลอง (ไม่ใช่ QR ชำระเงินจริง) สร้างจากเลขที่การจองเพื่อให้แต่ละรายการหน้าตาต่างกัน
 function FakeQr({ seed }: { seed: string }) {
@@ -46,21 +45,29 @@ export default function Payment() {
   const nav = useNavigate()
   const { bookings, setStatus } = useBooking()
   const booking = bookings.find((b) => b.id === id)
-  const [left, setLeft] = useState(LIMIT_SEC)
+  const [now, setNow] = useState(() => Date.now())
   const [paying, setPaying] = useState(false)
 
   useEffect(() => {
-    const t = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000)
+    const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  if (!booking) return <ErrorState title="ไม่พบรายการจอง" text="ลิงก์นี้อาจไม่ถูกต้อง ลองกลับไปที่หน้าการจอง" onRetry={() => nav('/bookings')} />
-  if (booking.status !== 'pending_payment' && !paying) return <Navigate to={`/bookings/${booking.id}`} replace />
+  // เวลาที่เหลือคิดจากเวลาที่สร้างการจอง (รีเฟรชหน้าแล้วไม่รีเซ็ต)
+  const left = booking ? Math.max(0, Math.ceil((booking.createdAt + PAYMENT_LIMIT_MS - now) / 1000)) : 0
 
-  const expired = left === 0
+  useEffect(() => {
+    if (booking && booking.status === 'pending_payment' && left === 0 && !paying) setStatus(booking.id, 'cancelled')
+  }, [booking, left, paying, setStatus])
+
+  if (!booking) return <ErrorState title="ไม่พบรายการจอง" text="ลิงก์นี้อาจไม่ถูกต้อง ลองกลับไปที่หน้าการจอง" onRetry={() => nav('/bookings')} />
+  if ((booking.status === 'confirmed' || booking.status === 'completed') && !paying) return <Navigate to={`/bookings/${booking.id}`} replace />
+
+  const expired = booking.status === 'cancelled' || left === 0
 
   // Phase 1: จำลองการชำระเงินเท่านั้น — Phase 7 ให้ Backend/Webhook เป็นผู้ยืนยันการจ่ายเงินจริง
   const mockPay = () => {
+    if (left === 0) return
     setPaying(true)
     setTimeout(() => {
       setStatus(booking.id, 'confirmed')
@@ -68,16 +75,13 @@ export default function Payment() {
     }, 1400)
   }
 
-  const expire = () => {
-    setStatus(booking.id, 'cancelled')
-    nav('/booking', { replace: true })
-  }
+  const rebook = () => nav('/booking', { replace: true })
 
   if (expired) {
     return (
       <div>
         <PageHeader title="ชำระเงิน" />
-        <EmptyState icon={<TimerOff size={28} />} title="หมดเวลาชำระเงิน" text="รายการจองนี้ถูกยกเลิกแล้ว คุณสามารถจองคิวใหม่ได้" action={<button onClick={expire} className="h-12 rounded-2xl bg-gold px-8 font-semibold text-night">จองคิวใหม่</button>} />
+        <EmptyState icon={<TimerOff size={28} />} title="รายการนี้ถูกยกเลิกหรือหมดเวลาชำระเงิน" text="รอบเวลานี้ถูกปล่อยคืนแล้ว คุณสามารถจองคิวใหม่ได้" action={<button onClick={rebook} className="h-12 rounded-2xl bg-gold px-8 font-semibold text-night">จองคิวใหม่</button>} />
       </div>
     )
   }

@@ -1,21 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import type { Booking, CustomerInfo } from '../types'
-import { EMPTY_CUSTOMER, seedBookings } from '../services/mockBookings'
-import { toISO } from '../utils/format'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { Booking, BookingStatus, CustomerInfo, Draft } from '../types'
 import { getService, isMultiGroup } from '../data/services'
+import { EMPTY_CUSTOMER, buildBooking, settleBookings, validateDraft } from '../utils/bookingRules'
+import { BOOKINGS_KEY, blankDraft, loadBookings, loadCustomer, loadDraft, saveBookings, saveCustomer, saveDraft } from '../utils/storage'
 
-const SAVED_KEY = 'witchyu.customer'
-
-export interface Draft {
-  customer: CustomerInfo
-  remember: boolean
-  serviceIds: string[]
-  multi: boolean            // โหมดเลือกหลายรายการ
-  questionCount: number
-  date: string
-  time: string
-  note: string
-}
+export type CreateResult = { ok: true; booking: Booking } | { ok: false; error: string; step: number }
 
 interface Ctx {
   draft: Draft
@@ -25,8 +14,8 @@ interface Ctx {
   profile: CustomerInfo
   setProfile: (c: CustomerInfo) => void
   bookings: Booking[]
-  addBooking: (b: Omit<Booking, 'id' | 'status'>) => Booking
-  setStatus: (id: string, status: Booking['status']) => void
+  createBooking: () => CreateResult
+  setStatus: (id: string, status: BookingStatus) => void
 }
 
 const BookingCtx = createContext<Ctx | null>(null)
@@ -36,57 +25,68 @@ export const useBooking = () => {
   return c
 }
 
-function loadSaved(): CustomerInfo | null {
-  try {
-    const raw = localStorage.getItem(SAVED_KEY)
-    return raw ? { ...EMPTY_CUSTOMER, ...JSON.parse(raw) } : null
-  } catch {
-    return null
-  }
-}
-
-const blankDraft = (customer: CustomerInfo): Draft => ({
-  customer, remember: true, serviceIds: [], multi: false, questionCount: 1, date: toISO(new Date()), time: '', note: '',
-})
-
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const saved = useMemo(loadSaved, [])
-  const [profile, setProfileState] = useState<CustomerInfo>(saved ?? seedBookings()[0].customer)
-  const [draft, setDraft] = useState<Draft>(() => blankDraft(saved ?? EMPTY_CUSTOMER))
-  const [bookings, setBookings] = useState<Booking[]>(seedBookings)
+  const [profile, setProfileState] = useState<CustomerInfo>(() => loadCustomer() ?? EMPTY_CUSTOMER)
+  const [draft, setDraft] = useState<Draft>(() => loadDraft(loadCustomer() ?? EMPTY_CUSTOMER))
+  const [bookings, setBookings] = useState<Booking[]>(() => settleBookings(loadBookings(), Date.now()))
 
-  const persist = (c: CustomerInfo) => {
-    try { localStorage.setItem(SAVED_KEY, JSON.stringify(c)) } catch { /* ignore */ }
-  }
+  // บันทึกลง LocalStorage ทุกครั้งที่ข้อมูลเปลี่ยน
+  useEffect(() => saveBookings(bookings), [bookings])
+  useEffect(() => saveDraft(draft), [draft])
+
+  // อัปเดตสถานะตามเวลา (หมดเวลาชำระ / เลยเวลานัด)
+  useEffect(() => {
+    const t = setInterval(() => setBookings((b) => settleBookings(b, Date.now())), 15000)
+    return () => clearInterval(t)
+  }, [])
+
+  // เปิดหลายแท็บ: รับข้อมูลที่แท็บอื่นเพิ่งบันทึก
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === BOOKINGS_KEY) setBookings(settleBookings(loadBookings(), Date.now()))
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const patchDraft = useCallback((p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p })), [])
-  // เปิดโหมด: ตัดรายการที่เลือกไว้ในเซ็ตที่เลือกหลายรายการไม่ได้ออก / ยกเลิก: ล้างการเลือกทั้งหมด
+  const resetDraft = useCallback(() => setDraft(blankDraft(loadCustomer() ?? EMPTY_CUSTOMER)), [])
+
+  // เปิดโหมด: ตัดรายการที่อยู่ในเซ็ตที่เลือกหลายรายการไม่ได้ออก / ยกเลิก: ล้างการเลือกทั้งหมด
   const setMulti = useCallback((on: boolean) => {
     setDraft((d) => on
       ? { ...d, multi: true, time: '', serviceIds: d.serviceIds.filter((id) => isMultiGroup(getService(id)?.group)) }
       : { ...d, multi: false, time: '', serviceIds: [] })
   }, [])
-  const resetDraft = useCallback(() => setDraft(blankDraft(loadSaved() ?? EMPTY_CUSTOMER)), [])
 
   const setProfile = useCallback((c: CustomerInfo) => {
     setProfileState(c)
-    persist(c)
+    saveCustomer(c)
   }, [])
 
-  const addBooking: Ctx['addBooking'] = useCallback((b) => {
-    const ymd = b.date.split('-').join('')
-    const seq = bookings.filter((x) => x.id.startsWith(`WY-${ymd}`)).length + 1
-    const created: Booking = { ...b, id: `WY-${ymd}-${String(seq).padStart(3, '0')}`, status: 'pending_payment' }
-    setBookings((list) => [created, ...list])
-    return created
-  }, [bookings])
+  const createBooking = useCallback((): CreateResult => {
+    const now = Date.now()
+    // อ่านข้อมูลล่าสุดจากที่เก็บก่อนตรวจ กันกรณีแท็บอื่นเพิ่งจองรอบเดียวกัน
+    const current = settleBookings(loadBookings(), now)
+    const err = validateDraft(draft, current, now)
+    if (err) {
+      setBookings(current)
+      return { ok: false, error: err.message, step: err.step }
+    }
+    const booking = buildBooking(draft, current, now)
+    const next = [booking, ...current]
+    saveBookings(next)
+    setBookings(next)
+    if (draft.remember) setProfile(booking.customer)
+    return { ok: true, booking }
+  }, [draft, setProfile])
 
-  const setStatus = useCallback((id: string, status: Booking['status']) => {
+  const setStatus = useCallback((id: string, status: BookingStatus) => {
     setBookings((list) => list.map((x) => (x.id === id ? { ...x, status } : x)))
   }, [])
 
   return (
-    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, bookings, addBooking, setStatus }}>
+    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, bookings, createBooking, setStatus }}>
       {children}
     </BookingCtx.Provider>
   )

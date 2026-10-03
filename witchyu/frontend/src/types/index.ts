@@ -30,10 +30,25 @@ export interface Booking {
   price: number
   date: string             // YYYY-MM-DD
   time: string             // HH:mm
+  otherQuestion?: string   // คำถามที่ลูกค้าพิมพ์เองเมื่อเลือก "อื่นๆ"
   note: string
   customer: CustomerInfo
   status: BookingStatus
   isCall: boolean
+  createdAt: number        // epoch ms — ใช้นับเวลาชำระเงิน
+}
+
+// ข้อมูลที่กำลังกรอกระหว่างจอง (Booking State)
+export interface Draft {
+  customer: CustomerInfo
+  remember: boolean
+  serviceIds: string[]
+  multi: boolean            // โหมดเลือกหลายรายการ
+  questionCount: number
+  otherQuestion: string
+  date: string
+  time: string
+  note: string
 }
 
 export type SlotStatus = 'available' | 'full' | 'closed'

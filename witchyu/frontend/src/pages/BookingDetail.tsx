@@ -38,6 +38,7 @@ export default function BookingDetail() {
     ['วันที่', dateLong(b.date)],
     ['เวลา', `${b.time} น.`],
     ['ราคา', baht(b.price)],
+    ...(b.otherQuestion ? ([['คำถามของคุณ', b.otherQuestion]] as [string, string][]) : []),
     ['หมายเหตุ', b.note || '-'],
   ]
   const canCancel = b.status === 'confirmed' || b.status === 'pending_payment'

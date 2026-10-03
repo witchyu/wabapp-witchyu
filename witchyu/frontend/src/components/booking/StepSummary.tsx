@@ -6,7 +6,9 @@ export default function StepSummary() {
   const { draft } = useBooking()
   const svcs = selectedServices(draft.serviceIds)
   if (svcs.length === 0) return null
-  const name = svcs.map((s) => (s.perQuestion ? `${s.name} (${draft.questionCount} คำถาม)` : s.name)).join('\n')
+  const name = svcs
+    .map((s) => (s.perQuestion ? `${s.name} (${draft.questionCount} คำถาม)` : s.id === 'ch-other' ? `${s.name}: ${draft.otherQuestion.trim()}` : s.name))
+    .join('\n')
   const rows: [string, string][] = [
     ['ชื่อ', `${draft.customer.nickname} (${draft.customer.fullName})`],
     ['บริการ', name],

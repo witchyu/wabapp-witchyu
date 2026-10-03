@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import BottomSheet from '../BottomSheet'
 import { useBooking } from '../../hooks/useBooking'
 import { GROUPS, SERVICES, servicePrice } from '../../data/services'
 import { SHOP } from '../../data/shop'
@@ -12,10 +13,33 @@ export default function StepService() {
   const [openIds, setOpenIds] = useState<string[]>([])
   const { serviceIds, multi, questionCount } = draft
 
-  const select = (svc: Service) => {
+  // กล่องข้อความของ "อื่นๆ" (คำถาม 2 ทางเลือก)
+  const [otherOpen, setOtherOpen] = useState(false)
+  const [otherText, setOtherText] = useState('')
+  const [otherErr, setOtherErr] = useState('')
+
+  const applyToggle = (svc: Service) => {
     const on = serviceIds.includes(svc.id)
     if (multi) patchDraft({ serviceIds: on ? serviceIds.filter((x) => x !== svc.id) : [...serviceIds, svc.id], time: '' })
     else patchDraft({ serviceIds: on ? [] : [svc.id], time: '' })
+  }
+  const openOther = () => {
+    setOtherText(draft.otherQuestion)
+    setOtherErr('')
+    setOtherOpen(true)
+  }
+  const select = (svc: Service) => {
+    if (svc.id === 'ch-other' && !serviceIds.includes(svc.id)) return openOther()
+    applyToggle(svc)
+  }
+  const saveOther = () => {
+    const text = otherText.trim()
+    if (!text) return setOtherErr('กรุณาพิมพ์คำถามของคุณ')
+    const svc = SERVICES.find((x) => x.id === 'ch-other')
+    if (!svc) return
+    patchDraft({ otherQuestion: text })
+    if (!serviceIds.includes(svc.id)) applyToggle(svc)
+    setOtherOpen(false)
   }
   const toggleOpen = (id: string) => setOpenIds((x) => (x.includes(id) ? x.filter((i) => i !== id) : [...x, id]))
 
@@ -80,6 +104,12 @@ export default function StepService() {
                       <span className="flex-1 font-medium">{svc.name}{callOff && <span className="block text-xs font-normal text-warn">ขณะนี้ปิดรับจองโทร</span>}</span>
                       <span className="font-semibold text-gold">{svc.price} <span className="text-xs font-normal text-mute">บาท</span></span>
                     </button>
+                    {svc.id === 'ch-other' && sel && (
+                      <div className="px-4 pb-3">
+                        <p className="break-words rounded-xl bg-night/60 p-3 text-sm text-mute">“{draft.otherQuestion}”</p>
+                        <button onClick={openOther} className="mt-1 h-10 text-sm text-gold">แก้ไขคำถาม</button>
+                      </div>
+                    )}
                     {svc.questions && (
                       <div className="px-4 pb-1">
                         <button onClick={() => toggleOpen(svc.id)} aria-expanded={expanded} className="flex h-10 items-center gap-1 text-sm text-gold">
@@ -96,6 +126,24 @@ export default function StepService() {
           </section>
         )
       })}
+
+      <BottomSheet open={otherOpen} title="พิมพ์คำถามของคุณ" onClose={() => setOtherOpen(false)}>
+        <label className="grid gap-2 text-sm">คำถามที่อยากถามหมอดู (อื่นๆ — 49 บาท)
+          <textarea
+            autoFocus
+            rows={5}
+            value={otherText}
+            onChange={(e) => { setOtherText(e.target.value.slice(0, 300)); setOtherErr('') }}
+            placeholder="เช่น ควรย้ายไปอยู่ต่างจังหวัดไหม ระหว่างอยู่กรุงเทพฯ กับเชียงใหม่"
+            className="w-full resize-none rounded-xl border border-line bg-night p-4 text-ink placeholder:text-mute/60 focus:border-gold focus:outline-none"
+          />
+          <span className="flex justify-between text-xs"><span className="text-bad">{otherErr}</span><span className="text-mute">{otherText.length}/300</span></span>
+        </label>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button onClick={() => setOtherOpen(false)} className="h-12 rounded-2xl bg-raised text-sm font-medium">ยกเลิก</button>
+          <button onClick={saveOther} className="h-12 rounded-2xl bg-gold text-sm font-semibold text-night">ตกลง</button>
+        </div>
+      </BottomSheet>
     </div>
   )
 }
