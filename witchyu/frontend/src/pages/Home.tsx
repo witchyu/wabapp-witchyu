@@ -5,15 +5,10 @@ import { SHOP } from '../data/shop'
 import { FEATURED_IDS, getService } from '../data/services'
 import BottomSheet from '../components/BottomSheet'
 
-const isOpenNow = () => {
-  const h = new Date().getHours()
-  return SHOP.isOpen && h >= SHOP.openHour && h < SHOP.closeHour
-}
-
 export default function Home() {
   const nav = useNavigate()
   const [contact, setContact] = useState(false)
-  const open = isOpenNow()
+  const open = SHOP.openNow
   const featured = FEATURED_IDS.map(getService).filter((s) => s && s.active)
 
   return (

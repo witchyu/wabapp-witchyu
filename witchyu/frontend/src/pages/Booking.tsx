@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CalendarX, ChevronLeft, ListChecks, X } from 'lucide-react'
+import { CalendarX, ChevronLeft, ListChecks, Loader2, X } from 'lucide-react'
 import StepInfo from '../components/booking/StepInfo'
 import StepService from '../components/booking/StepService'
 import StepDateTime from '../components/booking/StepDateTime'
@@ -11,7 +11,7 @@ import PageHeader from '../components/PageHeader'
 import { useBooking } from '../hooks/useBooking'
 import { useToast } from '../hooks/useToast'
 import { getService, selectionTotal } from '../data/services'
-import { validateCustomer, validateSchedule, validateSelection } from '../utils/bookingRules'
+import { validateCustomer, validateSelection } from '../utils/bookingRules'
 import { SHOP } from '../data/shop'
 
 const TITLES = ['ข้อมูลผู้จอง', 'เลือกบริการ', 'วันและเวลา', 'หมายเหตุ', 'สรุปการจอง']
@@ -20,8 +20,9 @@ export default function Booking() {
   const nav = useNavigate()
   const toast = useToast()
   const [params] = useSearchParams()
-  const { draft, patchDraft, setMulti, resetDraft, bookings, createBooking } = useBooking()
+  const { draft, patchDraft, setMulti, resetDraft, createBooking } = useBooking()
   const [step, setStep] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
 
   // มาจากหน้า Services/Home พร้อมบริการที่เลือกไว้แล้ว
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function Booking() {
   const validate = (): string | null => {
     if (step === 0) return validateCustomer(draft.customer)
     if (step === 1) return validateSelection(draft)
-    if (step === 2) return validateSchedule(draft, bookings, Date.now())
+    if (step === 2) return draft.time ? null : 'กรุณาเลือกเวลา'
     return null
   }
 
@@ -53,8 +54,12 @@ export default function Booking() {
 
   const back = () => (step === 0 ? nav(-1) : setStep((s) => s - 1))
 
-  const confirm = () => {
-    const result = createBooking()
+  // เซิร์ฟเวอร์ตรวจซ้ำทั้งหมด (ข้อมูล บริการ ราคา รอบว่าง) ก่อนสร้างการจองจริง
+  const confirm = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    const result = await createBooking()
+    setSubmitting(false)
     if (!result.ok) {
       toast(result.error, 'error')
       setStep(result.step)
@@ -102,8 +107,8 @@ export default function Booking() {
               <span className="font-semibold text-gold">รวม {selectionTotal(draft.serviceIds, draft.questionCount)} บาท</span>
             </div>
           )}
-          <button onClick={last ? confirm : next} className="h-14 w-full rounded-2xl bg-gold text-base font-semibold text-night active:scale-[.98]">
-            {last ? 'ยืนยันการจอง' : 'ถัดไป'}
+          <button disabled={submitting} onClick={last ? confirm : next} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gold text-base font-semibold text-night active:scale-[.98] disabled:opacity-70">
+            {submitting ? <><Loader2 className="animate-spin" size={20} />กำลังจอง</> : last ? 'ยืนยันการจอง' : 'ถัดไป'}
           </button>
         </div>
       </div>

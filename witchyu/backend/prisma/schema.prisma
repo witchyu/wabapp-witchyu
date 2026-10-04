@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ServiceGroup {
+  question
+  call
+  topic
+  choice
+  love59
+  love49
+  work
+  study
+}
+
+enum BookingStatus {
+  pending_payment
+  confirmed
+  completed
+  cancelled
+}
+
+enum SenderRole {
+  customer
+  admin
+}
+
+enum CallStatus {
+  ringing
+  active
+  ended
+  missed
+  rejected
+  failed
+}
+
+// ลูกค้า — Phase 3 ระบุตัวด้วย clientId ที่สร้างในเบราว์เซอร์ (ยังไม่มีล็อกอิน) Phase 8 เปลี่ยนเป็นบัญชีจริง
+model User {
+  id           String    @id @default(cuid())
+  clientId     String    @unique
+  nickname     String
+  fullName     String
+  age          Int
+  relationship String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  bookings     Booking[]
+  messages     Message[]
+}
+
+model Service {
+  id          String       @id // เช่น q-3, c-30 (ใช้เป็นรหัสเดียวกับหน้าเว็บ)
+  group       ServiceGroup
+  name        String
+  description String       @default("")
+  price       Int          // บาท (ต่อข้อ ถ้า perQuestion = true)
+  durationMin Int?
+  unlimited   Boolean      @default(false) // จองได้เฉพาะรอบ 22:30
+  perQuestion Boolean      @default(false)
+  questions   String[]
+  active      Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// รอบเวลา (HH:mm) และจำนวนคิวสูงสุดต่อรอบ
+model TimeSlot {
+  id       Int     @id @default(autoincrement())
+  time     String  @unique
+  capacity Int     @default(1)
+  active   Boolean @default(true)
+}
+
+model Booking {
+  id            String        @id // WY-YYYYMMDD-NNN
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  serviceIds    String[]
+  serviceName   String
+  questionCount Int?
+  otherQuestion String?
+  price         Int           // คำนวณฝั่งเซิร์ฟเวอร์เสมอ
+  date          String        // YYYY-MM-DD (เวลาไทย)
+  time          String        // HH:mm
+  note          String        @default("")
+  nickname      String
+  fullName      String
+  age           Int
+  relationship  String
+  isCall        Boolean       @default(false)
+  status        BookingStatus @default(pending_payment)
+  expiresAt     DateTime      // หมดเวลาชำระเงิน
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  messages      Message[]
+  calls         CallSession[]
+
+  @@index([date, time])
+  @@index([userId])
+  @@index([status, expiresAt])
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime  @default(now())
+  messages     Message[]
+}
+
+model Message {
+  id         String     @id @default(cuid())
+  bookingId  String
+  booking    Booking    @relation(fields: [bookingId], references: [id])
+  senderRole SenderRole
+  userId     String?
+  user       User?      @relation(fields: [userId], references: [id])
+  adminId    String?
+  admin      Admin?     @relation(fields: [adminId], references: [id])
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+model CallSession {
+  id        String     @id @default(cuid())
+  bookingId String
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  status    CallStatus @default(ringing)
+  startedAt DateTime?
+  endedAt   DateTime?
+  endReason String?
+  createdAt DateTime   @default(now())
+
+  @@index([bookingId])
+}
+
+// เวลาเปิด-ปิดรายวัน (0 = อาทิตย์ ... 6 = เสาร์)
+model BusinessHours {
+  id        Int     @id @default(autoincrement())
+  dayOfWeek Int     @unique
+  openTime  String
+  closeTime String
+  isClosed  Boolean @default(false)
+}
+
+// วันหยุด / ปิดรับจองรายวัน
+model Holiday {
+  id     Int    @id @default(autoincrement())
+  date   String @unique // YYYY-MM-DD
+  reason String @default("")
+}
+
+// สวิตช์ของร้าน (มีแถวเดียว id = 1) — Admin เปิด/ปิดร้าน และเปิด/ปิดรับจองโทร
+model ShopSetting {
+  id           Int      @id @default(1)
+  shopOpen     Boolean  @default(true)
+  callsEnabled Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+}

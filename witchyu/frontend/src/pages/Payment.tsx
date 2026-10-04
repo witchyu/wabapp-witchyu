@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Loader2, TimerOff } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
-import { EmptyState, ErrorState } from '../components/states'
+import { EmptyState, ErrorState, Spinner } from '../components/states'
 import { useBooking } from '../hooks/useBooking'
 import { baht, dateLong, mmss } from '../utils/format'
-import { PAYMENT_LIMIT_MS } from '../data/shop'
+import { useToast } from '../hooks/useToast'
+import { errorMessage } from '../services/api'
 
 // QR จำลอง (ไม่ใช่ QR ชำระเงินจริง) สร้างจากเลขที่การจองเพื่อให้แต่ละรายการหน้าตาต่างกัน
 function FakeQr({ seed }: { seed: string }) {
@@ -43,7 +44,8 @@ function FakeQr({ seed }: { seed: string }) {
 export default function Payment() {
   const { id } = useParams()
   const nav = useNavigate()
-  const { bookings, setStatus } = useBooking()
+  const toast = useToast()
+  const { bookings, bookingsStatus, refreshBookings, payBooking } = useBooking()
   const booking = bookings.find((b) => b.id === id)
   const [now, setNow] = useState(() => Date.now())
   const [paying, setPaying] = useState(false)
@@ -53,26 +55,34 @@ export default function Payment() {
     return () => clearInterval(t)
   }, [])
 
-  // เวลาที่เหลือคิดจากเวลาที่สร้างการจอง (รีเฟรชหน้าแล้วไม่รีเซ็ต)
-  const left = booking ? Math.max(0, Math.ceil((booking.createdAt + PAYMENT_LIMIT_MS - now) / 1000)) : 0
+  // เวลาที่เหลือคิดจากเวลาหมดอายุที่เซิร์ฟเวอร์กำหนด (รีเฟรชหน้าแล้วไม่รีเซ็ต)
+  const left = booking ? Math.max(0, Math.ceil((booking.expiresAt - now) / 1000)) : 0
+  const timedOut = left === 0
 
+  // หมดเวลาแล้ว ให้ดึงสถานะล่าสุดจากเซิร์ฟเวอร์ (เซิร์ฟเวอร์เป็นผู้ยกเลิกและคืนรอบเวลา)
+  const pending = booking?.status === 'pending_payment'
   useEffect(() => {
-    if (booking && booking.status === 'pending_payment' && left === 0 && !paying) setStatus(booking.id, 'cancelled')
-  }, [booking, left, paying, setStatus])
+    if (pending && timedOut && !paying) refreshBookings()
+  }, [pending, timedOut, paying, refreshBookings])
 
+  if (!booking && bookingsStatus === 'loading') return <Spinner />
   if (!booking) return <ErrorState title="ไม่พบรายการจอง" text="ลิงก์นี้อาจไม่ถูกต้อง ลองกลับไปที่หน้าการจอง" onRetry={() => nav('/bookings')} />
   if ((booking.status === 'confirmed' || booking.status === 'completed') && !paying) return <Navigate to={`/bookings/${booking.id}`} replace />
 
   const expired = booking.status === 'cancelled' || left === 0
 
-  // Phase 1: จำลองการชำระเงินเท่านั้น — Phase 7 ให้ Backend/Webhook เป็นผู้ยืนยันการจ่ายเงินจริง
-  const mockPay = () => {
-    if (left === 0) return
+  // ชำระเงินจำลอง (เฉพาะช่วงพัฒนา เปิด/ปิดที่เซิร์ฟเวอร์) — Phase 7 ให้ Webhook ของ Payment Provider เป็นผู้ยืนยันการจ่ายเงินจริง
+  const mockPay = async () => {
+    if (paying || left === 0) return
     setPaying(true)
-    setTimeout(() => {
-      setStatus(booking.id, 'confirmed')
+    try {
+      await payBooking(booking.id)
       nav(`/success/${booking.id}`, { replace: true })
-    }, 1400)
+    } catch (e) {
+      setPaying(false)
+      toast(errorMessage(e), 'error')
+      refreshBookings()
+    }
   }
 
   const rebook = () => nav('/booking', { replace: true })
@@ -114,7 +124,7 @@ export default function Payment() {
         <button disabled={paying} onClick={mockPay} className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gold text-base font-semibold text-night active:scale-[.98] disabled:opacity-70">
           {paying ? <><Loader2 className="animate-spin" size={20} />กำลังตรวจสอบ</> : 'ฉันชำระเงินแล้ว'}
         </button>
-        <p className="mt-3 text-center text-xs text-mute">Phase 1 เป็นการจำลอง การกดปุ่มนี้ยังไม่ได้ตรวจสอบเงินเข้าจริง ระบบจริงจะให้เซิร์ฟเวอร์ยืนยันการชำระเงินใน Phase 7</p>
+        <p className="mt-3 text-center text-xs text-mute">ปุ่มนี้เป็นการชำระเงินจำลองสำหรับช่วงพัฒนา ยังไม่ได้ตรวจสอบเงินเข้าจริง ระบบจริงจะให้เซิร์ฟเวอร์ยืนยันการชำระเงินใน Phase 7</p>
       </div>
     </div>
   )

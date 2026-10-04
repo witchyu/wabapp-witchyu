@@ -1,17 +1,16 @@
 // ข้อมูลร้านแบบจำลอง — Phase 4 จะดึงจาก Database (Admin จัดการได้)
+// สถานะร้านมาจากเซิร์ฟเวอร์ (Admin เป็นผู้ตั้งค่า) — ค่าเริ่มต้นนี้ใช้ก่อนโหลดสำเร็จเท่านั้น
 export const SHOP = {
   name: 'Witchyu',
-  openHour: 18,
-  closeHour: 23,
-  isOpen: true,        // สวิตช์เปิด/ปิดร้าน
+  isOpen: true,        // สวิตช์เปิดรับจองคิว (ปิด = จองไม่ได้)
   callsEnabled: true,  // สวิตช์เปิดรับจองโทร
-  hoursLabel: 'ทุกวัน 18:00 – 23:00 น.',
+  openNow: false,      // อยู่ในเวลาทำการตอนนี้หรือไม่ (รวมวันหยุด)
+  hoursLabel: '',
 }
 
-export const BASE_SLOTS = ['18:00', '19:00', '20:00', '21:00', '22:30']
-export const UNLIMITED_SLOT = '22:30'
+export interface ShopStatus { isOpen: boolean; callsEnabled: boolean; openNow: boolean; hoursLabel: string }
+export const setShop = (s: ShopStatus) => { Object.assign(SHOP, s) }
+
 export const BOOKING_DAYS = 7
-export const SLOT_CAPACITY = 1                     // จำนวนคิวสูงสุดต่อรอบเวลา (Phase 4 ให้ Admin กำหนดได้)
-export const PAYMENT_LIMIT_MS = 15 * 60 * 1000     // เวลาที่ถือรอบไว้ระหว่างรอชำระเงิน
 
 export const RELATIONSHIPS = ['โสด', 'มีแฟน', 'คุยอยู่', 'แต่งงานแล้ว', 'ไม่ระบุ']

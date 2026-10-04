@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import BottomSheet from '../BottomSheet'
 import { useBooking } from '../../hooks/useBooking'
-import { GROUPS, SERVICES, servicePrice } from '../../data/services'
+import { GROUPS, servicePrice } from '../../data/services'
+import { useServices } from '../../hooks/useServices'
 import { SHOP } from '../../data/shop'
 import type { Service } from '../../types'
 
@@ -10,6 +11,7 @@ const MULTI_BLOCKED_TEXT = 'ไม่สามารถเลือกหลา�
 
 export default function StepService() {
   const { draft, patchDraft } = useBooking()
+  const { services: SERVICES } = useServices()
   const [openIds, setOpenIds] = useState<string[]>([])
   const { serviceIds, multi, questionCount } = draft
 

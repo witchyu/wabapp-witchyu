@@ -1,14 +1,13 @@
 import { BOOKING_DAYS } from '../data/shop'
-import { SERVICES } from '../data/services'
-import type { Booking, BookingStatus, CustomerInfo, Draft } from '../types'
+import { getServices } from '../data/services'
+import type { CustomerInfo, Draft } from '../types'
 import { addDays, toISO } from './format'
-import { SLOTS } from './slots'
 
-export const BOOKINGS_KEY = 'witchyu.bookings.v1'
+// เก็บเฉพาะข้อมูลฝั่งเครื่อง: ข้อมูลผู้จอง และแบบฟอร์มที่กรอกค้างไว้ (การจองจริงอยู่ที่เซิร์ฟเวอร์)
 const DRAFT_KEY = 'witchyu.draft.v1'
 const CUSTOMER_KEY = 'witchyu.customer'
+const LEGACY_KEYS = ['witchyu.bookings.v1'] // ข้อมูลทดลองเก่าของ Phase 2 (เก็บในเครื่อง) ไม่ใช้แล้ว
 
-const STATUSES: BookingStatus[] = ['pending_payment', 'confirmed', 'completed', 'cancelled']
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
 
 function read(key: string): unknown {
@@ -22,36 +21,18 @@ function read(key: string): unknown {
 function write(key: string, value: unknown) {
   try {
     const s = JSON.stringify(value)
-    if (localStorage.getItem(key) !== s) localStorage.setItem(key, s) // ไม่เขียนซ้ำถ้าเหมือนเดิม
+    if (localStorage.getItem(key) !== s) localStorage.setItem(key, s)
   } catch { /* โหมดส่วนตัว/พื้นที่เต็ม: ใช้งานต่อได้แต่ไม่บันทึก */ }
+}
+
+export function clearLegacyStorage() {
+  try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)) } catch { /* ignore */ }
 }
 
 const cleanCustomer = (raw: unknown): CustomerInfo => {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   return { nickname: str(o.nickname), fullName: str(o.fullName), age: str(o.age), relationship: str(o.relationship) }
 }
-
-export function isBooking(x: unknown): x is Booking {
-  if (!x || typeof x !== 'object') return false
-  const b = x as Record<string, unknown>
-  return (
-    typeof b.id === 'string' && /^WY-\d{8}-\d+$/.test(b.id) &&
-    typeof b.serviceId === 'string' && typeof b.serviceName === 'string' &&
-    typeof b.price === 'number' && Number.isFinite(b.price) &&
-    typeof b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.date) &&
-    typeof b.time === 'string' && /^\d{2}:\d{2}$/.test(b.time) &&
-    typeof b.note === 'string' && typeof b.isCall === 'boolean' &&
-    typeof b.createdAt === 'number' &&
-    STATUSES.includes(b.status as BookingStatus) &&
-    !!b.customer && typeof b.customer === 'object'
-  )
-}
-
-export function loadBookings(): Booking[] {
-  const raw = read(BOOKINGS_KEY)
-  return Array.isArray(raw) ? raw.filter(isBooking).map((b) => ({ ...b, customer: cleanCustomer(b.customer) })) : []
-}
-export const saveBookings = (list: Booking[]) => write(BOOKINGS_KEY, list)
 
 export function loadCustomer(): CustomerInfo | null {
   const raw = read(CUSTOMER_KEY)
@@ -69,7 +50,7 @@ export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now:
   const base = blankDraft(fallbackCustomer, now)
   if (!raw || typeof raw !== 'object') return base
   const o = raw as Record<string, unknown>
-  const known = new Set(SERVICES.filter((s) => s.active).map((s) => s.id))
+  const known = new Set(getServices().filter((s) => s.active).map((s) => s.id))
   const ids = Array.isArray(o.serviceIds) ? [...new Set(o.serviceIds.filter((x): x is string => typeof x === 'string' && known.has(x)))] : []
   const multi = o.multi === true
   const validDates = Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(now), i)))
@@ -83,7 +64,7 @@ export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now:
     questionCount: Number.isInteger(qc) && qc >= 1 && qc <= 50 ? qc : 1,
     otherQuestion: str(o.otherQuestion).slice(0, 300),
     date,
-    time: date === o.date && typeof o.time === 'string' && SLOTS.includes(o.time) ? o.time : '',
+    time: date === o.date && typeof o.time === 'string' && /^\d{2}:\d{2}$/.test(o.time) ? o.time : '',
     note: str(o.note).slice(0, 500),
   }
 }

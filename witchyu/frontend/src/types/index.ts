@@ -24,7 +24,8 @@ export interface CustomerInfo {
 
 export interface Booking {
   id: string
-  serviceId: string
+  serviceId: string        // รายการแรก (ใช้หาระยะเวลา/ชนิดบริการ)
+  serviceIds: string[]
   serviceName: string
   questionCount?: number
   price: number
@@ -35,7 +36,8 @@ export interface Booking {
   customer: CustomerInfo
   status: BookingStatus
   isCall: boolean
-  createdAt: number        // epoch ms — ใช้นับเวลาชำระเงิน
+  createdAt: number        // epoch ms
+  expiresAt: number        // epoch ms — หมดเวลาชำระเงิน (เซิร์ฟเวอร์เป็นผู้กำหนด)
 }
 
 // ข้อมูลที่กำลังกรอกระหว่างจอง (Booking State)
@@ -52,3 +54,10 @@ export interface Draft {
 }
 
 export type SlotStatus = 'available' | 'full' | 'closed'
+
+export interface DaySlots {
+  date: string
+  closed: boolean         // ทั้งวันปิดรับ (วันหยุด/นอกช่วง 7 วัน)
+  reason?: string
+  slots: { time: string; status: SlotStatus }[]
+}

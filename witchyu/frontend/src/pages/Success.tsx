@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
-import { ErrorState } from '../components/states'
+import { ErrorState, Spinner } from '../components/states'
 import StatusBadge from '../components/StatusBadge'
 import { useBooking } from '../hooks/useBooking'
 import { dateLong } from '../utils/format'
@@ -8,8 +8,9 @@ import { dateLong } from '../utils/format'
 export default function Success() {
   const { id } = useParams()
   const nav = useNavigate()
-  const { bookings } = useBooking()
+  const { bookings, bookingsStatus } = useBooking()
   const b = bookings.find((x) => x.id === id)
+  if (!b && bookingsStatus === 'loading') return <Spinner />
   if (!b) return <ErrorState title="ไม่พบรายการจอง" text="ลองเปิดดูในหน้าการจอง" onRetry={() => nav('/bookings')} />
 
   const rows: [string, string][] = [

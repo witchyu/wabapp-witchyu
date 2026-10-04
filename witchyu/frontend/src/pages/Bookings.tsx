@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ClipboardX } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
-import { EmptyState } from '../components/states'
+import { EmptyState, ErrorState, Spinner } from '../components/states'
 import { useBooking } from '../hooks/useBooking'
 import type { Booking } from '../types'
 import { baht, dateShort } from '../utils/format'
@@ -16,12 +16,15 @@ const TABS = [
 
 export default function Bookings() {
   const nav = useNavigate()
-  const { bookings } = useBooking()
+  const { bookings, bookingsStatus, bookingsError, refreshBookings } = useBooking()
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('upcoming')
   const current = TABS.find((t) => t.id === tab)!
   const list = bookings
     .filter(current.match)
     .sort((a, b) => (tab === 'upcoming' ? `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`) : `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)))
+
+  if (bookingsStatus === 'loading') return <div><PageHeader title="การจอง" /><Spinner /></div>
+  if (bookingsStatus === 'error') return <div><PageHeader title="การจอง" /><ErrorState title="โหลดรายการจองไม่สำเร็จ" text={bookingsError} onRetry={refreshBookings} /></div>
 
   return (
     <div>

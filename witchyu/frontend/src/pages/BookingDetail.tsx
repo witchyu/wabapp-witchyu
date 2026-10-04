@@ -4,7 +4,8 @@ import { MessageCircle, Phone } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
-import { ErrorState } from '../components/states'
+import { ErrorState, Spinner } from '../components/states'
+import { errorMessage } from '../services/api'
 import { useBooking } from '../hooks/useBooking'
 import { useToast } from '../hooks/useToast'
 import { getService } from '../data/services'
@@ -26,10 +27,13 @@ export default function BookingDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const toast = useToast()
-  const { bookings, setStatus } = useBooking()
+  const { bookings, bookingsStatus, bookingsError, refreshBookings, cancelBooking } = useBooking()
   const [askCancel, setAskCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const b = bookings.find((x) => x.id === id)
 
+  if (!b && bookingsStatus === 'loading') return <div><PageHeader title="รายละเอียดการจอง" back="/bookings" /><Spinner /></div>
+  if (!b && bookingsStatus === 'error') return <div><PageHeader title="รายละเอียดการจอง" back="/bookings" /><ErrorState title="โหลดรายการจองไม่สำเร็จ" text={bookingsError} onRetry={refreshBookings} /></div>
   if (!b) return <div><PageHeader title="รายละเอียดการจอง" back="/bookings" /><ErrorState title="ไม่พบรายการจอง" text="รายการนี้อาจถูกลบไปแล้ว" onRetry={() => nav('/bookings')} /></div>
 
   const rows: [string, string][] = [
@@ -65,7 +69,20 @@ export default function BookingDetail() {
         </div>
       </div>
 
-      <Modal open={askCancel} danger title="ยกเลิกการจองนี้?" confirmLabel="ยกเลิกการจอง" cancelLabel="ไม่ยกเลิก" onCancel={() => setAskCancel(false)} onConfirm={() => { setStatus(b.id, 'cancelled'); setAskCancel(false); toast('ยกเลิกการจองแล้ว', 'success') }}>
+      <Modal open={askCancel} danger title="ยกเลิกการจองนี้?" confirmLabel="ยกเลิกการจอง" cancelLabel="ไม่ยกเลิก" onCancel={() => setAskCancel(false)} onConfirm={async () => {
+        if (cancelling) return
+        setCancelling(true)
+        try {
+          await cancelBooking(b.id)
+          toast('ยกเลิกการจองแล้ว', 'success')
+        } catch (e) {
+          toast(errorMessage(e), 'error')
+          refreshBookings()
+        } finally {
+          setCancelling(false)
+          setAskCancel(false)
+        }
+      }}>
         รายการ {b.id} จะย้ายไปอยู่ในแท็บ “ยกเลิก”
       </Modal>
     </div>

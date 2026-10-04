@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Booking, BookingStatus, CustomerInfo, Draft } from '../types'
-import { getService, isMultiGroup } from '../data/services'
-import { EMPTY_CUSTOMER, buildBooking, settleBookings, validateDraft } from '../utils/bookingRules'
-import { BOOKINGS_KEY, blankDraft, loadBookings, loadCustomer, loadDraft, saveBookings, saveCustomer, saveDraft } from '../utils/storage'
+import type { Booking, CustomerInfo, Draft } from '../types'
+import { getService, isMultiGroup, selectedServices } from '../data/services'
+import { EMPTY_CUSTOMER } from '../utils/bookingRules'
+import { blankDraft, clearLegacyStorage, loadCustomer, loadDraft, saveCustomer, saveDraft } from '../utils/storage'
+import { ApiError, errorMessage } from '../services/api'
+import { bookingApi, type CreateBookingPayload } from '../services/bookingApi'
 
 export type CreateResult = { ok: true; booking: Booking } | { ok: false; error: string; step: number }
+export type LoadStatus = 'loading' | 'ready' | 'error'
 
 interface Ctx {
   draft: Draft
@@ -14,8 +17,12 @@ interface Ctx {
   profile: CustomerInfo
   setProfile: (c: CustomerInfo) => void
   bookings: Booking[]
-  createBooking: () => CreateResult
-  setStatus: (id: string, status: BookingStatus) => void
+  bookingsStatus: LoadStatus
+  bookingsError: string
+  refreshBookings: () => Promise<void>
+  createBooking: () => Promise<CreateResult>
+  cancelBooking: (id: string) => Promise<Booking>
+  payBooking: (id: string) => Promise<Booking>
 }
 
 const BookingCtx = createContext<Ctx | null>(null)
@@ -25,29 +32,49 @@ export const useBooking = () => {
   return c
 }
 
+// รหัสข้อผิดพลาดจากเซิร์ฟเวอร์ → ขั้นตอนในหน้าจองที่ต้องย้อนกลับไปแก้
+function stepForCode(code: string): number {
+  if (code === 'VALIDATION_CUSTOMER' || code === 'SHOP_CLOSED') return 0
+  if (['SERVICE_NOT_FOUND', 'SERVICE_UNAVAILABLE', 'SELECTION_INVALID', 'CALLS_DISABLED', 'VALIDATION_SERVICE'].includes(code)) return 1
+  if (['SLOT_FULL', 'SLOT_CLOSED', 'DAY_CLOSED', 'DATE_OUT_OF_RANGE', 'VALIDATION_SCHEDULE'].includes(code)) return 2
+  return 4
+}
+
+const upsert = (list: Booking[], b: Booking) => [b, ...list.filter((x) => x.id !== b.id)].sort((x, y) => y.createdAt - x.createdAt)
+
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<CustomerInfo>(() => loadCustomer() ?? EMPTY_CUSTOMER)
   const [draft, setDraft] = useState<Draft>(() => loadDraft(loadCustomer() ?? EMPTY_CUSTOMER))
-  const [bookings, setBookings] = useState<Booking[]>(() => settleBookings(loadBookings(), Date.now()))
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [bookingsStatus, setStatus] = useState<LoadStatus>('loading')
+  const [bookingsError, setError] = useState('')
 
-  // บันทึกลง LocalStorage ทุกครั้งที่ข้อมูลเปลี่ยน
-  useEffect(() => saveBookings(bookings), [bookings])
+  useEffect(clearLegacyStorage, [])
   useEffect(() => saveDraft(draft), [draft])
 
-  // อัปเดตสถานะตามเวลา (หมดเวลาชำระ / เลยเวลานัด)
-  useEffect(() => {
-    const t = setInterval(() => setBookings((b) => settleBookings(b, Date.now())), 15000)
-    return () => clearInterval(t)
+  const refreshBookings = useCallback(async () => {
+    try {
+      setBookings(await bookingApi.list())
+      setStatus('ready')
+      setError('')
+    } catch (e) {
+      // ถ้าเคยโหลดสำเร็จแล้ว ให้คงข้อมูลเดิมไว้ ไม่เด้งเป็นหน้า error
+      setStatus((s) => (s === 'ready' ? 'ready' : 'error'))
+      setError(errorMessage(e))
+    }
   }, [])
 
-  // เปิดหลายแท็บ: รับข้อมูลที่แท็บอื่นเพิ่งบันทึก
+  // โหลดตอนเปิดแอป และรีเฟรชเมื่อกลับมาที่แท็บ / ทุก 60 วินาทีขณะเปิดหน้าอยู่ (รับสถานะหมดเวลา/เสร็จสิ้นจากเซิร์ฟเวอร์)
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === BOOKINGS_KEY) setBookings(settleBookings(loadBookings(), Date.now()))
+    refreshBookings()
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshBookings() }
+    document.addEventListener('visibilitychange', onVisible)
+    const t = setInterval(onVisible, 60000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(t)
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  }, [refreshBookings])
 
   const patchDraft = useCallback((p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p })), [])
   const resetDraft = useCallback(() => setDraft(blankDraft(loadCustomer() ?? EMPTY_CUSTOMER)), [])
@@ -64,29 +91,43 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     saveCustomer(c)
   }, [])
 
-  const createBooking = useCallback((): CreateResult => {
-    const now = Date.now()
-    // อ่านข้อมูลล่าสุดจากที่เก็บก่อนตรวจ กันกรณีแท็บอื่นเพิ่งจองรอบเดียวกัน
-    const current = settleBookings(loadBookings(), now)
-    const err = validateDraft(draft, current, now)
-    if (err) {
-      setBookings(current)
-      return { ok: false, error: err.message, step: err.step }
+  const createBooking = useCallback(async (): Promise<CreateResult> => {
+    const svcs = selectedServices(draft.serviceIds)
+    const payload: CreateBookingPayload = {
+      customer: draft.customer,
+      serviceIds: draft.serviceIds,
+      questionCount: svcs.some((s) => s.perQuestion) ? draft.questionCount : undefined,
+      otherQuestion: draft.serviceIds.includes('ch-other') ? draft.otherQuestion.trim() : undefined,
+      date: draft.date,
+      time: draft.time,
+      note: draft.note.trim(),
     }
-    const booking = buildBooking(draft, current, now)
-    const next = [booking, ...current]
-    saveBookings(next)
-    setBookings(next)
-    if (draft.remember) setProfile(booking.customer)
-    return { ok: true, booking }
+    try {
+      const booking = await bookingApi.create(payload)
+      setBookings((l) => upsert(l, booking))
+      setStatus('ready')
+      if (draft.remember) setProfile(booking.customer)
+      return { ok: true, booking }
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : ''
+      return { ok: false, error: errorMessage(e), step: stepForCode(code) }
+    }
   }, [draft, setProfile])
 
-  const setStatus = useCallback((id: string, status: BookingStatus) => {
-    setBookings((list) => list.map((x) => (x.id === id ? { ...x, status } : x)))
+  const cancelBooking = useCallback(async (id: string) => {
+    const b = await bookingApi.cancel(id)
+    setBookings((l) => upsert(l, b))
+    return b
+  }, [])
+
+  const payBooking = useCallback(async (id: string) => {
+    const b = await bookingApi.mockPay(id)
+    setBookings((l) => upsert(l, b))
+    return b
   }, [])
 
   return (
-    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, bookings, createBooking, setStatus }}>
+    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, bookings, bookingsStatus, bookingsError, refreshBookings, createBooking, cancelBooking, payBooking }}>
       {children}
     </BookingCtx.Provider>
   )

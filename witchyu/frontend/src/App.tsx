@@ -10,14 +10,17 @@ import BookingDetail from './pages/BookingDetail'
 import Chat from './pages/Chat'
 import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
+import AdminApp from './pages/admin/AdminApp'
 import { ToastProvider } from './hooks/useToast'
 import { BookingProvider } from './hooks/useBooking'
+import { ServicesGate, ServicesProvider } from './hooks/useServices'
 
-export default function App() {
+// แอปลูกค้า (ต้องโหลดบริการ/สถานะร้านจากเซิร์ฟเวอร์ก่อนแสดงหน้า)
+function CustomerApp() {
   return (
-    <ToastProvider>
-      <BookingProvider>
-        <BrowserRouter>
+    <ServicesProvider>
+      <ServicesGate>
+        <BookingProvider>
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
@@ -32,8 +35,22 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
-        </BrowserRouter>
-      </BookingProvider>
+        </BookingProvider>
+      </ServicesGate>
+    </ServicesProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Admin แยกจากแอปลูกค้า: เส้นทาง /admin และไม่ผูกกับ BookingProvider */}
+          <Route path="/admin/*" element={<AdminApp />} />
+          <Route path="/*" element={<CustomerApp />} />
+        </Routes>
+      </BrowserRouter>
     </ToastProvider>
   )
 }

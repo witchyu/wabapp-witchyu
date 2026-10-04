@@ -3,15 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import ServiceCard from '../components/ServiceCard'
 import { EmptyState } from '../components/states'
-import { GROUPS, SERVICES } from '../data/services'
+import { GROUPS } from '../data/services'
+import { useServices } from '../hooks/useServices'
 import { SHOP } from '../data/shop'
 import type { ServiceGroup } from '../types'
 import { SearchX } from 'lucide-react'
 
 export default function Services() {
   const nav = useNavigate()
+  const { services } = useServices()
   const [group, setGroup] = useState<ServiceGroup>('question')
-  const list = useMemo(() => SERVICES.filter((s) => s.active && s.group === group), [group])
+  const list = useMemo(() => services.filter((s) => s.active && s.group === group), [services, group])
   const hint = GROUPS.find((g) => g.id === group)?.hint
 
   return (
