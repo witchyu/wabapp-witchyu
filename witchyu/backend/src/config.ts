@@ -21,4 +21,11 @@ export const config = {
   allowMockPayment: process.env.ALLOW_MOCK_PAYMENT === 'true',
   adminTokenSecret: adminSecret(),
   adminTokenTtlMs: 8 * 3600 * 1000, // ล็อกอินแอดมินอยู่ได้ 8 ชั่วโมง
+
+  // Data retention — ค่าเริ่มต้นเพื่อควบคุมขนาดฐานข้อมูลและ Free Tier
+  customerDataRetentionDays: Number(process.env.CUSTOMER_DATA_RETENTION_DAYS ?? 30),
+  bookingRetentionDays: Number(process.env.BOOKING_RETENTION_DAYS ?? 30),
+  chatRetentionDays: Number(process.env.CHAT_RETENTION_DAYS ?? 10),
+  callRecordRetentionDays: Number(process.env.CALL_RECORD_RETENTION_DAYS ?? 10),
+  systemLogRetentionDays: Number(process.env.SYSTEM_LOG_RETENTION_DAYS ?? 7),
 }
