@@ -11,6 +11,7 @@ export interface AdminService {
   perQuestion: boolean
   questions: string[]
   active: boolean
+  recommended: boolean
   sortOrder: number
 }
 export type AdminServiceInput = Omit<AdminService, 'id' | 'sortOrder'>

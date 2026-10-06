@@ -8,6 +8,8 @@ import AdminServices from './AdminServices'
 import AdminSlots from './AdminSlots'
 import AdminHours from './AdminHours'
 import AdminHolidays from './AdminHolidays'
+import AdminChats from './AdminChats'
+import AdminChatRoom from './AdminChatRoom'
 
 // ส่วน Admin แยกจากแอปลูกค้าโดยสิ้นเชิง (เส้นทาง /admin)
 export default function AdminApp() {
@@ -22,6 +24,8 @@ export default function AdminApp() {
           <Route path="slots" element={<AdminSlots />} />
           <Route path="hours" element={<AdminHours />} />
           <Route path="holidays" element={<AdminHolidays />} />
+          <Route path="chat" element={<AdminChats />} />
+          <Route path="chat/:id" element={<AdminChatRoom />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>

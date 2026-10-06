@@ -83,7 +83,11 @@ export async function createBooking(clientId: string, input: CreateBookingInput)
 
 export async function listBookings(clientId: string) {
   await settleBookings()
-  const rows = await prisma.booking.findMany({ where: { user: { clientId } }, orderBy: { createdAt: 'desc' } })
+  const rows = await prisma.booking.findMany({
+    where: { user: { clientId } },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  })
   return rows.map(toBookingDto)
 }
 

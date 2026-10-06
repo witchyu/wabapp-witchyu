@@ -20,7 +20,7 @@ export default function Booking() {
   const nav = useNavigate()
   const toast = useToast()
   const [params] = useSearchParams()
-  const { draft, patchDraft, setMulti, resetDraft, createBooking } = useBooking()
+  const { draft, patchDraft, setMulti, resetDraft, createBooking, setProfile } = useBooking()
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
 
@@ -49,6 +49,10 @@ export default function Booking() {
   const next = () => {
     const err = validate()
     if (err) return toast(err, 'error')
+    // ผ่านขั้นข้อมูลผู้จองแล้วและติ๊ก "จำข้อมูลของฉัน" → จำไว้ในอุปกรณ์นี้ทันที (ไม่ต้องรอจองสำเร็จ)
+    if (step === 0 && draft.remember) {
+      setProfile({ ...draft.customer, nickname: draft.customer.nickname.trim(), fullName: draft.customer.fullName.trim() })
+    }
     setStep((s) => s + 1)
   }
 
@@ -99,7 +103,13 @@ export default function Booking() {
         {step === 4 && <StepSummary />}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pt-3 backdrop-blur" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      <div
+        className="fixed inset-x-0 z-40 border-t border-line bg-surface/95 px-4 pt-3 backdrop-blur"
+        style={{
+          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: '12px',
+        }}
+      >
         <div className={`mx-auto ${step === 1 ? 'max-w-6xl' : 'max-w-2xl'}`}>
           {step >= 1 && draft.serviceIds.length > 0 && (
             <div className="mb-2 flex items-center justify-between text-sm">

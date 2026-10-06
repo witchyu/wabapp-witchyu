@@ -8,12 +8,15 @@ import Success from './pages/Success'
 import Bookings from './pages/Bookings'
 import BookingDetail from './pages/BookingDetail'
 import Chat from './pages/Chat'
+import ChatRoom from './pages/ChatRoom'
 import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
 import AdminApp from './pages/admin/AdminApp'
 import { ToastProvider } from './hooks/useToast'
 import { BookingProvider } from './hooks/useBooking'
 import { ServicesGate, ServicesProvider } from './hooks/useServices'
+import { ChatSocketProvider } from './hooks/useChatSocket'
+import { customerChatApi } from './services/chatApi'
 
 // แอปลูกค้า (ต้องโหลดบริการ/สถานะร้านจากเซิร์ฟเวอร์ก่อนแสดงหน้า)
 function CustomerApp() {
@@ -21,6 +24,7 @@ function CustomerApp() {
     <ServicesProvider>
       <ServicesGate>
         <BookingProvider>
+          <ChatSocketProvider role="customer" fetchUnread={customerChatApi.unread}>
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
@@ -31,10 +35,12 @@ function CustomerApp() {
               <Route path="/bookings" element={<Bookings />} />
               <Route path="/bookings/:id" element={<BookingDetail />} />
               <Route path="/chat" element={<Chat />} />
+              <Route path="/chat/:id" element={<ChatRoom />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
+          </ChatSocketProvider>
         </BookingProvider>
       </ServicesGate>
     </ServicesProvider>

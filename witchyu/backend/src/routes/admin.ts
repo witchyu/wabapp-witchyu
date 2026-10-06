@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAdmin } from '../middleware/adminAuth'
 import * as c from '../controllers/adminController'
+import { adminChat } from '../controllers/chatController'
 
 export const adminRoutes = Router()
 
@@ -35,3 +36,8 @@ adminRoutes.delete('/holidays/:id', c.deleteHoliday)
 
 adminRoutes.get('/settings', c.getSettings)
 adminRoutes.patch('/settings', c.updateSettings)
+
+adminRoutes.get('/chats', adminChat.threads)
+adminRoutes.get('/chats/unread', adminChat.unread)
+adminRoutes.get('/bookings/:id/messages', adminChat.history)
+adminRoutes.post('/bookings/:id/messages', adminChat.send)

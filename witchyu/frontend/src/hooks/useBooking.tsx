@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Booking, CustomerInfo, Draft } from '../types'
 import { getService, isMultiGroup, selectedServices } from '../data/services'
 import { EMPTY_CUSTOMER } from '../utils/bookingRules'
-import { blankDraft, clearLegacyStorage, loadCustomer, loadDraft, saveCustomer, saveDraft } from '../utils/storage'
+import { blankDraft, clearLegacyStorage, clearSavedCustomer as clearStoredCustomer, loadCustomer, loadDraft, loadRememberPref, saveCustomer, saveDraft, saveRememberPref } from '../utils/storage'
 import { ApiError, errorMessage } from '../services/api'
 import { bookingApi, type CreateBookingPayload } from '../services/bookingApi'
 
@@ -16,6 +16,8 @@ interface Ctx {
   resetDraft: () => void
   profile: CustomerInfo
   setProfile: (c: CustomerInfo) => void
+  hasSavedCustomer: boolean               // มีข้อมูลผู้จองที่จำไว้ในอุปกรณ์นี้หรือไม่
+  clearSavedCustomer: () => void          // ล้างข้อมูลที่จำไว้ + ช่องข้อมูลผู้จองในฟอร์ม
   bookings: Booking[]
   bookingsStatus: LoadStatus
   bookingsError: string
@@ -51,6 +53,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   useEffect(clearLegacyStorage, [])
   useEffect(() => saveDraft(draft), [draft])
+  // จำค่าที่ผู้ใช้เลือกที่ช่อง "จำข้อมูลของฉันในอุปกรณ์นี้" (เขียนเมื่อเปลี่ยนจากค่าที่เก็บไว้เท่านั้น)
+  useEffect(() => { if (draft.remember !== loadRememberPref()) saveRememberPref(draft.remember) }, [draft.remember])
 
   const refreshBookings = useCallback(async () => {
     try {
@@ -91,6 +95,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     saveCustomer(c)
   }, [])
 
+  const clearSavedCustomer = useCallback(() => {
+    clearStoredCustomer()
+    setProfileState(EMPTY_CUSTOMER)
+    setDraft((d) => ({ ...d, customer: EMPTY_CUSTOMER }))
+  }, [])
+
+  const hasSavedCustomer = !!(profile.nickname || profile.fullName || profile.age || profile.relationship)
+
   const createBooking = useCallback(async (): Promise<CreateResult> => {
     const svcs = selectedServices(draft.serviceIds)
     const payload: CreateBookingPayload = {
@@ -127,7 +139,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, bookings, bookingsStatus, bookingsError, refreshBookings, createBooking, cancelBooking, payBooking }}>
+    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, hasSavedCustomer, clearSavedCustomer, bookings, bookingsStatus, bookingsError, refreshBookings, createBooking, cancelBooking, payBooking }}>
       {children}
     </BookingCtx.Provider>
   )

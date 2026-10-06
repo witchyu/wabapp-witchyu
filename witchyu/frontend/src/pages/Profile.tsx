@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, ChevronRight, ClipboardList, LogOut, Mail, Shield, UserRound } from 'lucide-react'
+import { Bell, ChevronRight, ClipboardList, LogOut, Mail, Shield, Trash2, UserRound } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import BottomSheet from '../components/BottomSheet'
+import Modal from '../components/Modal'
 import { useBooking } from '../hooks/useBooking'
 import { useToast } from '../hooks/useToast'
 import { RELATIONSHIPS } from '../data/shop'
@@ -13,7 +14,8 @@ const input = 'h-12 w-full rounded-xl border border-line bg-night px-4 text-ink 
 export default function Profile() {
   const nav = useNavigate()
   const toast = useToast()
-  const { profile, setProfile } = useBooking()
+  const { profile, setProfile, hasSavedCustomer, clearSavedCustomer } = useBooking()
+  const [askClear, setAskClear] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<CustomerInfo>(profile)
 
@@ -30,6 +32,7 @@ export default function Profile() {
   const menu: { icon: ReactNode; label: string; onClick: () => void; soon?: boolean }[] = [
     { icon: <UserRound size={20} />, label: 'ข้อมูลส่วนตัว', onClick: () => { setForm(profile); setEditing(true) } },
     { icon: <ClipboardList size={20} />, label: 'ประวัติการจอง', onClick: () => nav('/bookings') },
+    { icon: <Trash2 size={20} />, label: 'ล้างข้อมูลที่บันทึกไว้', onClick: () => (hasSavedCustomer ? setAskClear(true) : toast('ยังไม่มีข้อมูลที่บันทึกไว้ในอุปกรณ์นี้', 'info')) },
     { icon: <Bell size={20} />, label: 'การแจ้งเตือน', onClick: soon('การแจ้งเตือน'), soon: true },
     { icon: <Shield size={20} />, label: 'ความเป็นส่วนตัว', onClick: soon('หน้าความเป็นส่วนตัว'), soon: true },
     { icon: <Mail size={20} />, label: 'ติดต่อเรา', onClick: soon('หน้าติดต่อเรา'), soon: true },
@@ -61,6 +64,18 @@ export default function Profile() {
           </li>
         ))}
       </ul>
+
+      <Modal
+        open={askClear}
+        danger
+        title="ล้างข้อมูลที่บันทึกไว้?"
+        confirmLabel="ล้างข้อมูล"
+        cancelLabel="ไม่ล้าง"
+        onCancel={() => setAskClear(false)}
+        onConfirm={() => { clearSavedCustomer(); setAskClear(false); toast('ล้างข้อมูลที่บันทึกไว้แล้ว', 'success') }}
+      >
+        ข้อมูลที่จำไว้ในอุปกรณ์นี้จะถูกลบ (การจองที่ทำไปแล้วไม่ได้รับผลกระทบ)
+      </Modal>
 
       <BottomSheet open={editing} title="ข้อมูลส่วนตัว" onClose={() => setEditing(false)}>
         <div className="grid gap-3">

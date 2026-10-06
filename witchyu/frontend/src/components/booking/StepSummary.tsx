@@ -1,5 +1,5 @@
 import { useBooking } from '../../hooks/useBooking'
-import { selectedServices, selectionTotal } from '../../data/services'
+import { selectedServices, servicePrice } from '../../data/services'
 import { baht, dateLong } from '../../utils/format'
 
 export default function StepSummary() {
@@ -9,6 +9,14 @@ export default function StepSummary() {
   const name = svcs
     .map((s) => (s.perQuestion ? `${s.name} (${draft.questionCount} คำถาม)` : s.id === 'ch-other' ? `${s.name}: ${draft.otherQuestion.trim()}` : s.name))
     .join('\n')
+
+
+  // ราคาสำหรับแสดงผลมาจาก service registry ที่โหลดจาก Database
+  // แต่ราคาสุดท้ายยังคงถูกคำนวณและยืนยันโดย Backend ตอนสร้าง Booking
+  const displayTotal = svcs.reduce(
+    (sum, service) => sum + servicePrice(service, draft.questionCount),
+    0,
+  )
   const rows: [string, string][] = [
     ['ชื่อ', `${draft.customer.nickname} (${draft.customer.fullName})`],
     ['บริการ', name],
@@ -27,7 +35,7 @@ export default function StepSummary() {
         ))}
         <div className="flex items-center justify-between px-4 py-4">
           <span className="text-mute">ราคา</span>
-          <span className="font-display text-2xl font-semibold text-gold">{baht(selectionTotal(draft.serviceIds, draft.questionCount))}</span>
+          <span className="font-display text-2xl font-semibold text-gold">{baht(displayTotal)}</span>
         </div>
       </div>
       <p className="mt-3 text-xs text-mute">หลังกดยืนยัน ระบบจะพาไปหน้าชำระเงิน ยังไม่ถือว่าจองสำเร็จจนกว่าจะชำระเงิน</p>

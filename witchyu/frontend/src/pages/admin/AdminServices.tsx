@@ -23,10 +23,11 @@ interface Form {
   perQuestion: boolean
   questionsText: string
   active: boolean
+  recommended: boolean
 }
 
-const blank = (group: ServiceGroup = 'question'): Form => ({ id: null, group, name: '', desc: '', price: '', durationMin: '', unlimited: false, perQuestion: false, questionsText: '', active: true })
-const fromService = (s: AdminService): Form => ({ id: s.id, group: s.group, name: s.name, desc: s.desc, price: String(s.price), durationMin: s.durationMin ? String(s.durationMin) : '', unlimited: s.unlimited, perQuestion: s.perQuestion, questionsText: s.questions.join('\n'), active: s.active })
+const blank = (group: ServiceGroup = 'question'): Form => ({ id: null, group, name: '', desc: '', price: '', durationMin: '', unlimited: false, perQuestion: false, questionsText: '', active: true, recommended: false })
+const fromService = (s: AdminService): Form => ({ id: s.id, group: s.group, name: s.name, desc: s.desc, price: String(s.price), durationMin: s.durationMin ? String(s.durationMin) : '', unlimited: s.unlimited, perQuestion: s.perQuestion, questionsText: s.questions.join('\n'), active: s.active, recommended: s.recommended })
 
 const input = 'h-12 w-full rounded-xl border border-line bg-night px-4 text-ink focus:border-gold focus:outline-none'
 
@@ -69,6 +70,7 @@ export default function AdminServices() {
       perQuestion: form.perQuestion,
       questions: form.questionsText.split('\n').map((q) => q.trim()).filter(Boolean),
       active: form.active,
+      recommended: form.recommended,
     }
     setSaving(true)
     try {
@@ -124,7 +126,7 @@ export default function AdminServices() {
                 {list.map((s) => (
                   <li key={s.id} className={`flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 ${s.active ? '' : 'opacity-60'}`}>
                     <div className="min-w-0 flex-1">
-                      <div className="break-words font-medium">{s.name}</div>
+                      <div className="break-words font-medium">{s.name}{s.recommended && <span className="ml-2 rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">แนะนำ</span>}</div>
                       <div className="text-sm text-gold">{s.price} บาท{s.perQuestion ? '/ข้อ' : ''}{s.durationMin ? ` · ${s.durationMin} นาที` : ''}{s.unlimited ? ' · รอบ 22:30' : ''}</div>
                     </div>
                     <Toggle label={`เปิดใช้งาน ${s.name}`} checked={s.active} onChange={(v) => toggleActive(s, v)} />
@@ -159,6 +161,7 @@ export default function AdminServices() {
               ['perQuestion', 'คิดราคาต่อข้อ (ลูกค้าระบุจำนวนคำถามเอง)'],
               ['unlimited', 'จองได้เฉพาะรอบ 22:30 (โทรไม่จำกัด)'],
               ['active', 'เปิดให้ลูกค้าเห็นและจอง'],
+              ['recommended', '⭐ แนะนำบนหน้าแรก'],
             ] as const).map(([k, label]) => (
               <div key={k} className="flex items-center justify-between gap-3 rounded-xl bg-night/60 px-4 py-3">
                 <span>{label}</span>

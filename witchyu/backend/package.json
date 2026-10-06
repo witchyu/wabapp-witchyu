@@ -1,13 +1,13 @@
 {
   "name": "witchyu-backend",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js .test-build/test/chat.test.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -23,7 +23,8 @@
     "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

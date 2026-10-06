@@ -8,7 +8,7 @@ export default {
         surface: '#181222',
         raised: '#221A31',
         line: '#2E2540',
-        gold: { DEFAULT: '#D4AE5C', soft: '#E8CC8C', deep: '#A98534' },
+        gold: { DEFAULT: '#A855F7', soft: '#D8B4FE', deep: '#7E22CE' },
         ink: '#F4EFE7',
         mute: '#9C92AB',
         ok: '#5FBF8F',

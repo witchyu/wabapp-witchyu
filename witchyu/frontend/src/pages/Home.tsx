@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarPlus, Clock, MessageCircle, Moon, Phone, Sparkles } from 'lucide-react'
 import { SHOP } from '../data/shop'
-import { FEATURED_IDS, getService } from '../data/services'
+import { getServices } from '../data/services'
 import BottomSheet from '../components/BottomSheet'
 
 export default function Home() {
   const nav = useNavigate()
   const [contact, setContact] = useState(false)
   const open = SHOP.openNow
-  const featured = FEATURED_IDS.map(getService).filter((s) => s && s.active)
+  const featured = getServices().filter((s) => s.active && s.recommended)
 
   return (
     <div>
@@ -61,21 +61,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mt-7">
-        <div className="flex items-center justify-between px-5">
-          <h2 className="font-display text-lg font-semibold">บริการแนะนำ</h2>
-          <button onClick={() => nav('/services')} className="h-10 text-sm text-gold">ดูทั้งหมด</button>
-        </div>
-        <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto px-5">
-          {featured.map((s) => s && (
-            <button key={s.id} onClick={() => nav(`/booking?service=${s.id}`)} className="w-44 shrink-0 rounded-2xl border border-line bg-surface p-4 text-left active:bg-raised">
-              <div className="font-semibold">{s.name}</div>
-              <div className="mt-1 line-clamp-2 text-xs text-mute">{s.desc}</div>
-              <div className="mt-3 font-display text-lg text-gold">{s.price} <span className="text-xs text-mute">บาท</span></div>
-            </button>
-          ))}
-        </div>
-      </section>
+      {featured.length > 0 && (
+        <section className="mt-7">
+          <div className="flex items-center justify-between px-5">
+            <h2 className="font-display text-lg font-semibold">บริการแนะนำ</h2>
+            <button onClick={() => nav('/services')} className="h-10 text-sm text-gold">ดูทั้งหมด</button>
+          </div>
+          <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto px-5">
+            {featured.map((s) => (
+              <button key={s.id} onClick={() => nav(`/booking?service=${s.id}`)} className="w-44 shrink-0 rounded-2xl border border-line bg-surface p-4 text-left active:bg-raised">
+                <div className="font-semibold">{s.name}</div>
+                <div className="mt-1 line-clamp-2 text-xs text-mute">{s.desc}</div>
+                <div className="mt-3 font-display text-lg text-gold">{s.price} <span className="text-xs text-mute">บาท</span></div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="px-5 pt-7">
         <button onClick={() => setContact(true)} className="h-12 w-full rounded-2xl border border-line bg-surface text-sm font-medium active:bg-raised">ติดต่อเรา</button>

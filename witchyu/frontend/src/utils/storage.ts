@@ -6,7 +6,10 @@ import { addDays, toISO } from './format'
 // เก็บเฉพาะข้อมูลฝั่งเครื่อง: ข้อมูลผู้จอง และแบบฟอร์มที่กรอกค้างไว้ (การจองจริงอยู่ที่เซิร์ฟเวอร์)
 const DRAFT_KEY = 'witchyu.draft.v1'
 const CUSTOMER_KEY = 'witchyu.customer'
+const REMEMBER_KEY = 'witchyu.remember' // ตัวเลือก "จำข้อมูลของฉันในอุปกรณ์นี้" (จำค่าที่ผู้ใช้เลือกไว้)
 const LEGACY_KEYS = ['witchyu.bookings.v1'] // ข้อมูลทดลองเก่าของ Phase 2 (เก็บในเครื่อง) ไม่ใช้แล้ว
+
+const BLANK_CUSTOMER: CustomerInfo = { nickname: '', fullName: '', age: '', relationship: '' }
 
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
 
@@ -40,10 +43,37 @@ export function loadCustomer(): CustomerInfo | null {
 }
 export const saveCustomer = (c: CustomerInfo) => write(CUSTOMER_KEY, c)
 
-export const blankDraft = (customer: CustomerInfo, now: number = Date.now()): Draft => ({
-  customer, remember: true, serviceIds: [], multi: false, questionCount: 1, otherQuestion: '',
-  date: toISO(new Date(now)), time: '', note: '',
-})
+// ค่าเริ่มต้น = จำข้อมูล (เหมือนเดิม) แต่ถ้าผู้ใช้เคยเอาติ๊กออก จะจำการเลือกนั้นไว้ ไม่ต้องติ๊กออกใหม่ทุกครั้ง
+export const loadRememberPref = (): boolean => read(REMEMBER_KEY) !== false
+export const saveRememberPref = (v: boolean) => write(REMEMBER_KEY, v)
+
+// ล้างเฉพาะ "ข้อมูลผู้จอง" ที่จำไว้ + ช่องข้อมูลผู้จองในฟอร์มที่กรอกค้าง
+// ไม่แตะรหัสอุปกรณ์ (witchyu.clientId) เพราะใช้ระบุการจองของเครื่องนี้ ถ้าลบจะมองไม่เห็นการจองเดิม
+export function clearSavedCustomer() {
+  try { localStorage.removeItem(CUSTOMER_KEY) } catch { /* ignore */ }
+  const draft = read(DRAFT_KEY)
+  if (draft && typeof draft === 'object') write(DRAFT_KEY, { ...(draft as Record<string, unknown>), customer: BLANK_CUSTOMER })
+}
+
+// เบราว์เซอร์บางโหมด (เช่น โหมดส่วนตัวบางรุ่น) เขียน localStorage ไม่ได้ — ใช้เตือนผู้ใช้ว่าจะจำข้อมูลไม่ได้
+export function storageWritable(): boolean {
+  try {
+    const k = 'witchyu.__probe'
+    localStorage.setItem(k, '1')
+    localStorage.removeItem(k)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export const blankDraft = (customer: CustomerInfo, now: number = Date.now()): Draft => {
+  const remember = loadRememberPref()
+  return {
+    customer: remember ? customer : BLANK_CUSTOMER, remember, serviceIds: [], multi: false, questionCount: 1, otherQuestion: '',
+    date: toISO(new Date(now)), time: '', note: '',
+  }
+}
 
 // กู้ข้อมูลที่กรอกค้างไว้ โดยตรวจทุกช่องก่อนใช้ (กันข้อมูลเก่า/เสียหาย/วันที่ผ่านไปแล้ว)
 export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now: number = Date.now()): Draft {
@@ -56,9 +86,13 @@ export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now:
   const validDates = Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(now), i)))
   const date = typeof o.date === 'string' && validDates.includes(o.date) ? o.date : base.date
   const qc = Number(o.questionCount)
+  const remember = o.remember !== false
+  // ถ้าไม่ได้เลือกให้จำข้อมูล ต้องไม่กู้ข้อมูลผู้จองจาก localStorage กลับมาในฟอร์ม
+  const typed = cleanCustomer(o.customer)
+  const typedEmpty = !typed.nickname && !typed.fullName && !typed.age && !typed.relationship
   return {
-    customer: cleanCustomer(o.customer),
-    remember: o.remember !== false,
+    customer: remember ? (typedEmpty ? fallbackCustomer : typed) : BLANK_CUSTOMER,
+    remember,
     serviceIds: multi ? ids : ids.slice(0, 1),
     multi,
     questionCount: Number.isInteger(qc) && qc >= 1 && qc <= 50 ? qc : 1,
@@ -70,4 +104,5 @@ export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now:
 }
 
 export const loadDraft = (fallbackCustomer: CustomerInfo): Draft => sanitizeDraft(read(DRAFT_KEY), fallbackCustomer)
-export const saveDraft = (d: Draft) => write(DRAFT_KEY, d)
+// ไม่ได้ติ๊ก "จำข้อมูลของฉัน" → ไม่เก็บชื่อ/อายุที่พิมพ์ไว้ลงเครื่อง (เก็บเฉพาะบริการ/วัน/เวลาที่เลือก)
+export const saveDraft = (d: Draft) => write(DRAFT_KEY, d.remember ? d : { ...d, customer: BLANK_CUSTOMER })

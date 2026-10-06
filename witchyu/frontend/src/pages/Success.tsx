@@ -34,7 +34,7 @@ export default function Success() {
       </div>
       <div className="mt-6 grid gap-3">
         <button onClick={() => nav(`/bookings/${b.id}`)} className="h-14 rounded-2xl bg-gold font-semibold text-night active:scale-[.98]">ดูรายละเอียด</button>
-        <button onClick={() => nav('/chat')} className="h-14 rounded-2xl bg-raised font-medium active:scale-[.98]">แชตกับหมอดู</button>
+        <button onClick={() => nav(`/chat/${b.id}`)} className="h-14 rounded-2xl bg-raised font-medium active:scale-[.98]">แชตกับหมอดู</button>
         <Link to="/" className="py-3 text-center text-sm text-mute">กลับหน้าแรก</Link>
       </div>
     </div>

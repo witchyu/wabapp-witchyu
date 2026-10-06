@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { adminApi } from '../../services/adminApi'
 import { errorMessage } from '../../services/api'
@@ -39,6 +40,7 @@ function Actions({ b, onDetail, onConfirm, onCancel, onChat, onCall }: ActionPro
 
 export default function AdminBookings() {
   const toast = useToast()
+  const nav = useNavigate()
   const [status, setStatus] = useState<AdminBookingFilter>('active')
   const [date, setDate] = useState('')
   const [searchInput, setSearchInput] = useState('')
@@ -77,7 +79,7 @@ export default function AdminBookings() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
   const actions = (b: Booking) => (
-    <Actions b={b} onDetail={() => setDetail(b)} onConfirm={() => setAsk({ kind: 'confirm', b })} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={placeholder('แชต', 5)} onCall={placeholder('โทร', 6)} />
+    <Actions b={b} onDetail={() => setDetail(b)} onConfirm={() => setAsk({ kind: 'confirm', b })} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={() => nav(`/admin/chat/${b.id}`)} onCall={placeholder('โทร', 6)} />
   )
 
   return (

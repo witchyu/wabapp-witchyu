@@ -1,4 +1,5 @@
 import type { Booking } from '../types'
+import type { ChatMessage, ChatPage, ChatThread } from '../types/chat'
 import type {
   AdminBookingFilter, AdminBookingList, AdminDashboard, AdminHoliday, AdminHours, AdminService, AdminServiceInput,
   AdminSettings, AdminSlot,
@@ -70,6 +71,13 @@ export const adminApi = {
   addHoliday: (h: { date: string; reason: string }) =>
     guard(() => api.post<{ holiday: AdminHoliday; affectedBookings: number }>(`${A}/holidays`, h, auth())),
   deleteHoliday: (id: number) => guard(() => api.del<{ ok: true }>(`${A}/holidays/${id}`, auth())),
+
+  chats: () => guard(() => api.get<{ threads: ChatThread[] }>(`${A}/chats`, auth())).then((r) => r.threads),
+  chatUnread: () => guard(() => api.get<{ unread: number }>(`${A}/chats/unread`, auth())).then((r) => r.unread),
+  chatHistory: (id: string, before?: string) =>
+    guard(() => api.get<ChatPage>(`${A}/bookings/${encodeURIComponent(id)}/messages?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}`, auth())),
+  chatSend: (id: string, body: string, clientMsgId: string) =>
+    guard(() => api.post<{ message: ChatMessage }>(`${A}/bookings/${encodeURIComponent(id)}/messages`, { body, clientMsgId }, auth())).then((r) => r.message),
 
   settings: () => guard(() => api.get<{ settings: AdminSettings }>(`${A}/settings`, auth())).then((r) => r.settings),
   updateSettings: (s: Partial<AdminSettings>) =>

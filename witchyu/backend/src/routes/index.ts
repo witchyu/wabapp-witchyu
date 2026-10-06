@@ -5,6 +5,7 @@ import { requireClientId } from '../middleware/clientId'
 import { getServices, getSlots } from '../controllers/catalogController'
 import * as booking from '../controllers/bookingController'
 import { adminRoutes } from './admin'
+import { customerChat } from '../controllers/chatController'
 import { getPublicShop } from '../services/shopService'
 
 export const api = Router()
@@ -31,6 +32,14 @@ bookings.get('/:id', booking.get)
 bookings.patch('/:id', booking.update)
 bookings.post('/:id/cancel', booking.cancel)
 bookings.post('/:id/mock-pay', booking.mockPay)
+bookings.get('/:id/messages', customerChat.history)
+bookings.post('/:id/messages', customerChat.send)
 api.use('/bookings', bookings)
+
+const chats = Router()
+chats.use(requireClientId)
+chats.get('/', customerChat.threads)
+chats.get('/unread', customerChat.unread)
+api.use('/chats', chats)
 
 api.use('/admin', adminRoutes)

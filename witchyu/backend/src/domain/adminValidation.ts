@@ -38,6 +38,7 @@ export interface ServiceInput {
   perQuestion: boolean
   questions: string[]
   active: boolean
+  recommended: boolean
 }
 
 function parseGroup(v: unknown): ServiceGroupId {
@@ -61,6 +62,7 @@ export function parseServiceCreate(body: unknown): ServiceInput {
     perQuestion: o.perQuestion == null ? false : bool(o.perQuestion, 'คิดราคาต่อข้อ'),
     questions: o.questions == null ? [] : parseQuestions(o.questions),
     active: o.active == null ? true : bool(o.active, 'สถานะเปิดใช้งาน'),
+    recommended: o.recommended == null ? false : bool(o.recommended, 'แนะนำบนหน้าแรก'),
   }
 }
 
@@ -76,6 +78,7 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
   if (o.perQuestion !== undefined) out.perQuestion = bool(o.perQuestion, 'คิดราคาต่อข้อ')
   if (o.questions !== undefined) out.questions = parseQuestions(o.questions)
   if (o.active !== undefined) out.active = bool(o.active, 'สถานะเปิดใช้งาน')
+  if (o.recommended !== undefined) out.recommended = bool(o.recommended, 'แนะนำบนหน้าแรก')
   if (Object.keys(out).length === 0) throw bad('ไม่มีข้อมูลที่ต้องการแก้ไข')
   return out
 }

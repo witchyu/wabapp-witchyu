@@ -11,6 +11,7 @@ export interface Service {
   perQuestion?: boolean    // บริการ "จำนวนคำถามกำหนดเอง"
   questions?: string[]     // รายการคำถามในเซ็ต (แสดงใน "ดูรายละเอียด")
   active: boolean          // Phase 4: Admin เปิด/ปิดได้
+  recommended?: boolean   // แสดงใน "บริการแนะนำ" บนหน้าแรก
 }
 
 export type BookingStatus = 'pending_payment' | 'confirmed' | 'completed' | 'cancelled'

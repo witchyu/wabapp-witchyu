@@ -60,7 +60,7 @@ export default function BookingDetail() {
 
         <div className="mt-5 grid gap-3">
           {b.status === 'pending_payment' && <button onClick={() => nav(`/payment/${b.id}`)} className="h-14 rounded-2xl bg-gold font-semibold text-night">ไปชำระเงิน</button>}
-          <button onClick={() => nav('/chat')} className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-raised font-medium"><MessageCircle size={20} />แชต</button>
+          <button onClick={() => nav(`/chat/${b.id}`)} className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-raised font-medium"><MessageCircle size={20} />แชต</button>
           {inCallWindow(b) && (
             <button onClick={() => toast('ระบบโทรเสียงจะเปิดใช้งานใน Phase 6 (ปุ่มนี้เป็น Placeholder)', 'info')} className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-ok font-semibold text-night"><Phone size={20} />โทร</button>
           )}

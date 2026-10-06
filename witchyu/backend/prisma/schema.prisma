@@ -64,6 +64,7 @@ model Service {
   perQuestion Boolean      @default(false)
   questions   String[]
   active      Boolean      @default(true)
+  recommended Boolean      @default(false)
   sortOrder   Int          @default(0)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -125,10 +126,13 @@ model Message {
   adminId    String?
   admin      Admin?     @relation(fields: [adminId], references: [id])
   body       String
+  clientMsgId String?   // รหัสที่หน้าเว็บสร้างเอง ใช้กันข้อความซ้ำเมื่อส่งใหม่หลังเน็ตหลุด
   readAt     DateTime?
   createdAt  DateTime   @default(now())
 
+  @@unique([bookingId, clientMsgId])
   @@index([bookingId, createdAt])
+  @@index([bookingId, senderRole, readAt])
 }
 
 model CallSession {

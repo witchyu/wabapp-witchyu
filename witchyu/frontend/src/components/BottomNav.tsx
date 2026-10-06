@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useChatSocket } from '../hooks/useChatSocket'
 import { CalendarPlus, ClipboardList, Home, MessageCircle, User } from 'lucide-react'
 
 const ITEMS = [
@@ -10,6 +11,7 @@ const ITEMS = [
 ]
 
 export default function BottomNav() {
+  const { unread } = useChatSocket()
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur safe-bottom" aria-label="เมนูหลัก">
       <ul className="mx-auto flex max-w-2xl">
@@ -18,7 +20,10 @@ export default function BottomNav() {
             <NavLink to={to} end={end} className={({ isActive }) => `flex h-16 flex-col items-center justify-center gap-1 text-[11px] transition-colors ${isActive ? 'text-gold' : 'text-mute'}`}>
               {({ isActive }) => (
                 <>
-                  <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                  <span className="relative">
+                    <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                    {to === '/chat' && unread > 0 && <span className="absolute -right-2 -top-1.5 grid h-4 min-w-[1rem] place-items-center rounded-full bg-bad px-1 text-[10px] font-bold text-ink" aria-label={`ข้อความใหม่ ${unread}`}>{unread > 9 ? '9+' : unread}</span>}
+                  </span>
                   <span className={isActive ? 'font-semibold' : ''}>{label}</span>
                 </>
               )}

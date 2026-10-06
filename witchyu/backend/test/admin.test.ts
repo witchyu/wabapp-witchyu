@@ -106,7 +106,7 @@ test('parseLogin', () => {
 
 test('parseServiceCreate / parseServicePatch', () => {
   const ok = parseServiceCreate({ group: 'topic', name: ' สุขภาพ ', price: '129' })
-  assert.deepEqual(ok, { group: 'topic', name: 'สุขภาพ', description: '', price: 129, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true })
+  assert.deepEqual(ok, { group: 'topic', name: 'สุขภาพ', description: '', price: 129, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false })
   assert.equal(code(() => parseServiceCreate({ group: 'nope', name: 'a', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: '', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: 'a', price: 0 })), 'VALIDATION')
@@ -151,6 +151,6 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
 })
 
 test('toAdminServiceDto keeps explicit false/empty values', () => {
-  const dto = toAdminServiceDto({ id: 'a', group: 'call', name: 'n', description: '', price: 5, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, sortOrder: 3 })
+  const dto = toAdminServiceDto({ id: 'a', group: 'call', name: 'n', description: '', price: 5, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false, sortOrder: 3 })
   assert.equal(dto.unlimited, false); assert.equal(dto.durationMin, null); assert.deepEqual(dto.questions, []); assert.equal(dto.sortOrder, 3)
 })

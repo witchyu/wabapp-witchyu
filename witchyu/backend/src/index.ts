@@ -1,21 +1,23 @@
+import { createServer } from 'node:http'
 import { createApp } from './app'
 import { config } from './config'
 import { prisma } from './db'
-import { settleBookings } from './services/bookingService'
+import { initSocket } from './socket'
 
 const app = createApp()
-const server = app.listen(config.port, '0.0.0.0', () => {
-  console.log(`Witchyu API listening on :${config.port}`)
+const httpServer = createServer(app)
+const io = initSocket(httpServer) // Socket.IO ใช้พอร์ตเดียวกับ API
+
+httpServer.listen(config.port, '0.0.0.0', () => {
+  console.log(`Witchyu API + realtime listening on :${config.port}`)
 })
 
-// อัปเดตสถานะตามเวลาเป็นระยะ (หมดเวลาชำระ / เสร็จสิ้น) นอกจากตอนมีคนเรียก API
-const timer = setInterval(() => {
-  settleBookings().catch((e) => console.error('[settle]', e))
-}, 60_000)
+// หมายเหตุ: ไม่มี timer ยิงฐานข้อมูลเป็นระยะ เพื่อให้ Neon ปิดเครื่องได้เมื่อไม่มีคนใช้ (ประหยัดโควตาฟรี)
+// สถานะหมดเวลา/เสร็จสิ้นของการจองถูกอัปเดตทุกครั้งที่มีคนเรียก API (settleBookings)
 
 async function shutdown() {
-  clearInterval(timer)
-  server.close()
+  io.close()
+  httpServer.close()
   await prisma.$disconnect()
   process.exit(0)
 }

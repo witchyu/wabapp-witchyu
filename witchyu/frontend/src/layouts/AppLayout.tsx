@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import BottomNav from '../components/BottomNav'
 
 // หน้าที่เป็น flow เฉพาะ (จอง/ชำระเงิน/สำเร็จ) ซ่อนแถบเมนูล่างเพื่อให้โฟกัส
-const HIDE_NAV = [/^\/booking$/, /^\/payment\//, /^\/success\//]
+const HIDE_NAV = [/^\/payment\//, /^\/success\//, /^\/chat\/./]
 // หน้ารายการ/ฟอร์มเลือกบริการใช้เต็มจอ ส่วนหน้าที่เนื้อหาเป็นคอลัมน์เดียวจำกัดความกว้างให้อ่านง่ายบน iPad
 const WIDE = ['/', '/services', '/bookings', '/booking']
 

@@ -50,6 +50,7 @@ export interface ServiceRowLike {
   perQuestion: boolean
   questions: string[]
   active: boolean
+  recommended: boolean
 }
 
 export function toServiceDto(s: ServiceRowLike) {
@@ -64,6 +65,7 @@ export function toServiceDto(s: ServiceRowLike) {
     perQuestion: s.perQuestion || undefined,
     questions: s.questions.length ? s.questions : undefined,
     active: s.active,
+    recommended: s.recommended || undefined,
   }
 }
 
@@ -82,6 +84,7 @@ export function toAdminServiceDto(s: AdminServiceRowLike) {
     perQuestion: s.perQuestion,
     questions: s.questions,
     active: s.active,
+    recommended: s.recommended,
     sortOrder: s.sortOrder,
   }
 }
