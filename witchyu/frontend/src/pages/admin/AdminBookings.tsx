@@ -25,13 +25,14 @@ const FILTERS: { id: AdminBookingFilter; label: string }[] = [
 const svcName = (b: Booking) => `${b.serviceName}${b.questionCount ? ` (${b.questionCount} คำถาม)` : ''}`
 const btn = 'h-10 rounded-lg px-3 text-xs font-medium'
 
-interface ActionProps { b: Booking; onDetail: () => void; onConfirm: () => void; onCancel: () => void; onChat: () => void; onCall: () => void }
-function Actions({ b, onDetail, onConfirm, onCancel, onChat, onCall }: ActionProps) {
+interface ActionProps { b: Booking; onDetail: () => void; onConfirm: () => void; onCancel: () => void; onChat: () => void; onCall: () => void; onDelete: () => void }
+function Actions({ b, onDetail, onConfirm, onCancel, onChat, onCall, onDelete }: ActionProps) {
   return (
     <div className="flex flex-wrap gap-1.5">
       <button onClick={onDetail} className={`${btn} bg-raised`}>ดูรายละเอียด</button>
       {b.status === 'pending_payment' && <button onClick={onConfirm} className={`${btn} bg-ok/20 text-ok`}>ยืนยัน</button>}
       {(b.status === 'pending_payment' || b.status === 'confirmed') && <button onClick={onCancel} className={`${btn} bg-bad/15 text-bad`}>ยกเลิก</button>}
+      {(b.status === 'completed' || b.status === 'cancelled') && <button onClick={onDelete} className={btn + ' bg-bad/15 text-bad'}>ลบถาวร</button>}
       <button onClick={onChat} className={`${btn} bg-raised`}>แชต</button>
       {b.isCall && <button onClick={onCall} className={`${btn} bg-raised`}>โทร</button>}
     </div>
@@ -47,7 +48,7 @@ export default function AdminBookings() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState<Booking | null>(null)
-  const [ask, setAsk] = useState<{ kind: 'confirm' | 'cancel'; b: Booking } | null>(null)
+  const [ask, setAsk] = useState<{ kind: 'confirm' | 'cancel' | 'delete'; b: Booking } | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -63,9 +64,21 @@ export default function AdminBookings() {
     if (!ask || busy) return
     setBusy(true)
     try {
-      if (ask.kind === 'confirm') await adminApi.confirmBooking(ask.b.id)
-      else await adminApi.cancelBooking(ask.b.id)
-      toast(ask.kind === 'confirm' ? 'ยืนยันการจองแล้ว' : 'ยกเลิกการจองแล้ว', 'success')
+      if (ask.kind === 'confirm') {
+        await adminApi.confirmBooking(ask.b.id)
+      } else if (ask.kind === 'cancel') {
+        await adminApi.cancelBooking(ask.b.id)
+      } else {
+        await adminApi.deleteBooking(ask.b.id)
+      }
+      toast(
+        ask.kind === 'confirm'
+          ? 'ยืนยันการจองแล้ว'
+          : ask.kind === 'cancel'
+            ? 'ยกเลิกการจองแล้ว'
+            : 'ลบรายการจองถาวรแล้ว',
+        'success',
+      )
       setAsk(null)
       reload()
     } catch (e) {
@@ -79,7 +92,7 @@ export default function AdminBookings() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
   const actions = (b: Booking) => (
-    <Actions b={b} onDetail={() => setDetail(b)} onConfirm={() => setAsk({ kind: 'confirm', b })} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={() => nav(`/admin/chat/${b.id}`)} onCall={placeholder('โทร', 6)} />
+    <Actions b={b} onDetail={() => setDetail(b)} onConfirm={() => setAsk({ kind: 'confirm', b })} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={() => nav(`/admin/chat/${b.id}`)} onCall={placeholder('โทร', 6)} onDelete={() => setAsk({ kind: 'delete', b })} />
   )
 
   return (
@@ -173,16 +186,30 @@ export default function AdminBookings() {
 
       <Modal
         open={!!ask}
-        danger={ask?.kind === 'cancel'}
-        title={ask?.kind === 'confirm' ? 'ยืนยันการจองนี้?' : 'ยกเลิกการจองนี้?'}
-        confirmLabel={ask?.kind === 'confirm' ? 'ยืนยัน' : 'ยกเลิกการจอง'}
+        danger={ask?.kind === 'cancel' || ask?.kind === 'delete'}
+        title={
+          ask?.kind === 'confirm'
+            ? 'ยืนยันการจองนี้?'
+            : ask?.kind === 'cancel'
+              ? 'ยกเลิกการจองนี้?'
+              : 'ลบรายการจองถาวร?'
+        }
+        confirmLabel={
+          ask?.kind === 'confirm'
+            ? 'ยืนยัน'
+            : ask?.kind === 'cancel'
+              ? 'ยกเลิกการจอง'
+              : 'ลบถาวร'
+        }
         cancelLabel="ปิด"
         onCancel={() => setAsk(null)}
         onConfirm={run}
       >
         {ask?.kind === 'confirm'
           ? `ยืนยัน ${ask.b.id} (ใช้เมื่อคุณตรวจแล้วว่าลูกค้าชำระเงินจริง)`
-          : ask && `ยกเลิก ${ask.b.id} — ถ้าลูกค้าชำระเงินแล้ว ต้องคืนเงินด้วยตัวเอง (ระบบคืนเงินอัตโนมัติจะมาพร้อมระบบชำระเงินจริง)`}
+          : ask?.kind === 'cancel'
+            ? `ยกเลิก ${ask.b.id} — ถ้าลูกค้าชำระเงินแล้ว ต้องคืนเงินด้วยตัวเอง (ระบบคืนเงินอัตโนมัติจะมาพร้อมระบบชำระเงินจริง)`
+            : ask && `ลบ ${ask.b.id} แบบถาวร? การลบจะไม่สามารถย้อนกลับได้ และข้อมูลข้อความ/การโทรของรายการนี้จะถูกลบด้วย`}
       </Modal>
     </div>
   )

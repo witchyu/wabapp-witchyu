@@ -20,6 +20,13 @@ function make(viewerOf: (req: Request) => Viewer) {
       const message = await chat.sendMessage(viewerOf(req), bid(req), parseMessageBody(b.body), parseClientMsgId(b.clientMsgId))
       res.status(201).json({ message })
     }),
+    deleteMessage: asyncHandler(async (req, res) => {
+      const messageId = String(req.params.messageId ?? '')
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(messageId)) {
+        throw new AppError(404, 'MESSAGE_NOT_FOUND', 'ไม่พบข้อความ')
+      }
+      res.json(await chat.deleteMessage(viewerOf(req), bid(req), messageId))
+    }),
   }
 }
 

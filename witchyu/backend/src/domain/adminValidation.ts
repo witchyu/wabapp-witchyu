@@ -30,6 +30,7 @@ function bool(v: unknown, label: string): boolean {
 // ---------- บริการ ----------
 export interface ServiceInput {
   group: ServiceGroupId
+  categoryId?: string
   name: string
   description: string
   price: number
@@ -50,10 +51,83 @@ function parseQuestions(v: unknown): string[] {
   return v.map((q) => str(q, 'คำถาม', 1, 200))
 }
 
+
+export type ServiceCategoryInput = {
+  id: string
+  label: string
+  hint: string
+  note: string
+  multi: boolean
+  active: boolean
+  sortOrder: number
+}
+
+export type ServiceCategoryPatch = Partial<Omit<ServiceCategoryInput, 'id'>>
+
+function parseCategoryId(v: unknown): string {
+  if (typeof v !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(v) || v.length > 50) {
+    throw bad('รหัสหมวดหมู่ไม่ถูกต้อง')
+  }
+  return v
+}
+
+function parseCategoryText(v: unknown, field: string, max = 200): string {
+  if (typeof v !== 'string' || v.length > max) {
+    throw bad(`${field}ไม่ถูกต้อง`)
+  }
+  return v
+}
+
+function parseCategorySortOrder(v: unknown): number {
+  if (!Number.isInteger(v) || (v as number) < 0 || (v as number) > 9999) {
+    throw bad('ลำดับหมวดหมู่ไม่ถูกต้อง')
+  }
+  return v as number
+}
+
+export function parseServiceCategoryCreate(body: unknown): ServiceCategoryInput {
+  const o = obj(body)
+
+  return {
+    id: parseCategoryId(o.id),
+    label: parseCategoryText(o.label, 'ชื่อหมวดหมู่', 100),
+    hint: parseCategoryText(o.hint ?? '', 'คำอธิบาย', 500),
+    note: parseCategoryText(o.note ?? '', 'หมายเหตุ', 1000),
+    multi: typeof o.multi === 'boolean' ? o.multi : false,
+    active: typeof o.active === 'boolean' ? o.active : true,
+    sortOrder: o.sortOrder === undefined ? 0 : parseCategorySortOrder(o.sortOrder),
+  }
+}
+
+export function parseServiceCategoryPatch(body: unknown): ServiceCategoryPatch {
+  const o = obj(body)
+  const out: ServiceCategoryPatch = {}
+
+  if ('label' in o) out.label = parseCategoryText(o.label, 'ชื่อหมวดหมู่', 100)
+  if ('hint' in o) out.hint = parseCategoryText(o.hint, 'คำอธิบาย', 500)
+  if ('note' in o) out.note = parseCategoryText(o.note, 'หมายเหตุ', 1000)
+  if ('multi' in o) {
+    if (typeof o.multi !== 'boolean') throw bad('multi ไม่ถูกต้อง')
+    out.multi = o.multi
+  }
+  if ('active' in o) {
+    if (typeof o.active !== 'boolean') throw bad('active ไม่ถูกต้อง')
+    out.active = o.active
+  }
+  if ('sortOrder' in o) out.sortOrder = parseCategorySortOrder(o.sortOrder)
+
+  if (Object.keys(out).length === 0) {
+    throw bad('ไม่มีข้อมูลสำหรับแก้ไข')
+  }
+
+  return out
+}
+
 export function parseServiceCreate(body: unknown): ServiceInput {
   const o = obj(body)
   return {
     group: parseGroup(o.group),
+    categoryId: o.categoryId === undefined ? undefined : parseCategoryId(o.categoryId),
     name: str(o.name, 'ชื่อบริการ', 1, 80),
     description: o.description == null ? '' : str(o.description, 'รายละเอียด', 0, 200),
     price: int(o.price, 'ราคา', 1, 100000),
@@ -70,6 +144,7 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
   const o = obj(body)
   const out: Partial<ServiceInput> = {}
   if (o.group !== undefined) out.group = parseGroup(o.group)
+  if (o.categoryId !== undefined) out.categoryId = parseCategoryId(o.categoryId)
   if (o.name !== undefined) out.name = str(o.name, 'ชื่อบริการ', 1, 80)
   if (o.description !== undefined) out.description = str(o.description, 'รายละเอียด', 0, 200)
   if (o.price !== undefined) out.price = int(o.price, 'ราคา', 1, 100000)
@@ -130,11 +205,44 @@ export function parseHolidayCreate(body: unknown): { date: string; reason: strin
 }
 
 // ---------- สวิตช์ร้าน ----------
-export function parseSettingsPatch(body: unknown): { shopOpen?: boolean; callsEnabled?: boolean } {
+export function parseSettingsPatch(body: unknown): {
+  shopOpen?: boolean
+  callsEnabled?: boolean
+  customerDataRetentionDays?: number
+  bookingRetentionDays?: number
+  chatRetentionDays?: number
+  callRecordRetentionDays?: number
+  systemLogRetentionDays?: number
+} {
   const o = obj(body)
-  const out: { shopOpen?: boolean; callsEnabled?: boolean } = {}
+  const out: {
+    shopOpen?: boolean
+    callsEnabled?: boolean
+    customerDataRetentionDays?: number
+    bookingRetentionDays?: number
+    chatRetentionDays?: number
+    callRecordRetentionDays?: number
+    systemLogRetentionDays?: number
+  } = {}
+
   if (o.shopOpen !== undefined) out.shopOpen = bool(o.shopOpen, 'สถานะร้าน')
   if (o.callsEnabled !== undefined) out.callsEnabled = bool(o.callsEnabled, 'สถานะรับจองโทร')
+
+  const retentionFields = [
+    ['customerDataRetentionDays', 'ระยะเวลาเก็บข้อมูลลูกค้า'],
+    ['bookingRetentionDays', 'ระยะเวลาเก็บข้อมูลการจอง'],
+    ['chatRetentionDays', 'ระยะเวลาเก็บข้อความแชต'],
+    ['callRecordRetentionDays', 'ระยะเวลาเก็บประวัติการโทร'],
+    ['systemLogRetentionDays', 'ระยะเวลาเก็บ System Log'],
+  ] as const
+
+  for (const [field, label] of retentionFields) {
+    if (o[field] !== undefined) {
+      const value = int(o[field], label, 1, 3650)
+      out[field] = value
+    }
+  }
+
   if (Object.keys(out).length === 0) throw bad('ไม่มีข้อมูลที่ต้องการแก้ไข')
   return out
 }

@@ -48,6 +48,35 @@ export async function listMessages(viewer: Viewer, bookingId: string, q: { limit
   }
 }
 
+export async function deleteMessage(viewer: Viewer, bookingId: string, messageId: string) {
+  if (viewer.role !== 'admin') {
+    throw new AppError(403, 'FORBIDDEN', 'เฉพาะแอดมินเท่านั้นที่ลบข้อความได้')
+  }
+
+  const booking = await loadBookingFor(viewer, bookingId)
+
+  const message = await prisma.message.findFirst({
+    where: {
+      id: messageId,
+      bookingId: booking.id,
+    },
+    select: {
+      id: true,
+      bookingId: true,
+    },
+  })
+
+  if (!message) {
+    throw new AppError(404, 'MESSAGE_NOT_FOUND', 'ไม่พบข้อความ')
+  }
+
+  await prisma.message.delete({
+    where: { id: message.id },
+  })
+
+  return { ok: true, id: message.id }
+}
+
 export async function sendMessage(viewer: Viewer, bookingId: string, body: string, clientMsgId?: string) {
   const booking = await loadBookingFor(viewer, bookingId)
   if (!canSend(viewer.role, booking.status)) {

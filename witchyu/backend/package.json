@@ -7,7 +7,7 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js .test-build/test/chat.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js .test-build/test/chat.test.js .test-build/test/adminDeleteBooking.test.js .test-build/test/adminRevenue.test.js .test-build/test/adminChatDelete.test.js .test-build/test/adminSettings.test.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

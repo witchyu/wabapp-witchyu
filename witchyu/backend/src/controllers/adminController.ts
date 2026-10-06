@@ -1,7 +1,8 @@
 import { asyncHandler } from '../middleware/asyncHandler'
 import {
   parseAdminBookingsQuery, parseHoursAll, parseHolidayCreate, parseIntParam, parseLogin, parseServiceCreate,
-  parseServicePatch, parseSettingsPatch, parseSlotCreate, parseSlotPatch,
+  parseServicePatch, parseServiceCategoryCreate, parseServiceCategoryPatch,
+  parseSettingsPatch, parseSlotCreate, parseSlotPatch,
 } from '../domain/adminValidation'
 import * as auth from '../services/adminAuthService'
 import * as admin from '../services/adminService'
@@ -24,11 +25,36 @@ export const listBookings = asyncHandler(async (req, res) => {
 export const getBooking = asyncHandler(async (req, res) => { res.json({ booking: await admin.getBooking(strParam(req.params.id)) }) })
 export const confirmBooking = asyncHandler(async (req, res) => { res.json({ booking: await admin.confirmBooking(strParam(req.params.id)) }) })
 export const cancelBooking = asyncHandler(async (req, res) => { res.json({ booking: await admin.cancelBooking(strParam(req.params.id)) }) })
+export const deleteBooking = asyncHandler(async (req, res) => { await admin.deleteBooking(strParam(req.params.id)); res.json({ ok: true }) })
 
 export const listServices = asyncHandler(async (_req, res) => { res.json({ services: await admin.listServices() }) })
 export const createService = asyncHandler(async (req, res) => { res.status(201).json({ service: await admin.createService(parseServiceCreate(req.body)) }) })
 export const updateService = asyncHandler(async (req, res) => { res.json({ service: await admin.updateService(strParam(req.params.id), parseServicePatch(req.body)) }) })
 export const deleteService = asyncHandler(async (req, res) => { await admin.deleteService(strParam(req.params.id)); res.json({ ok: true }) })
+
+export const listServiceCategories = asyncHandler(async (_req, res) => {
+  res.json({ categories: await admin.listServiceCategories() })
+})
+
+export const createServiceCategory = asyncHandler(async (req, res) => {
+  res.status(201).json({
+    category: await admin.createServiceCategory(parseServiceCategoryCreate(req.body)),
+  })
+})
+
+export const updateServiceCategory = asyncHandler(async (req, res) => {
+  res.json({
+    category: await admin.updateServiceCategory(
+      strParam(req.params.id),
+      parseServiceCategoryPatch(req.body),
+    ),
+  })
+})
+
+export const deleteServiceCategory = asyncHandler(async (req, res) => {
+  await admin.deleteServiceCategory(strParam(req.params.id))
+  res.json({ ok: true })
+})
 
 export const listSlots = asyncHandler(async (_req, res) => { res.json({ slots: await admin.listSlots() }) })
 export const createSlot = asyncHandler(async (req, res) => { res.status(201).json({ slot: await admin.createSlot(parseSlotCreate(req.body)) }) })

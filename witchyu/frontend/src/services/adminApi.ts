@@ -1,8 +1,9 @@
 import type { Booking } from '../types'
 import type { ChatMessage, ChatPage, ChatThread } from '../types/chat'
 import type {
-  AdminBookingFilter, AdminBookingList, AdminDashboard, AdminHoliday, AdminHours, AdminService, AdminServiceInput,
-  AdminSettings, AdminSlot,
+  AdminBookingFilter, AdminBookingList, AdminDashboard, AdminHoliday, AdminHours,
+  AdminService, AdminServiceInput, AdminServiceCategory, AdminServiceCategoryInput,
+  AdminServiceCategoryPatch, AdminSettings, AdminSlot,
 } from '../types/admin'
 import { ApiError, api } from './api'
 
@@ -51,6 +52,31 @@ export const adminApi = {
   },
   confirmBooking: (id: string) => guard(() => api.post<{ booking: Booking }>(`${A}/bookings/${encodeURIComponent(id)}/confirm`, {}, auth())),
   cancelBooking: (id: string) => guard(() => api.post<{ booking: Booking }>(`${A}/bookings/${encodeURIComponent(id)}/cancel`, {}, auth())),
+  deleteBooking: (id: string) => guard(() => api.del<{ ok: true }>(`${A}/bookings/${encodeURIComponent(id)}`, auth())),
+
+  serviceCategories: () =>
+    guard(() => api.get<{ categories: AdminServiceCategory[] }>(`${A}/service-categories`, auth()))
+      .then((r) => r.categories),
+
+  createServiceCategory: (category: AdminServiceCategoryInput) =>
+    guard(() => api.post<{ category: AdminServiceCategory }>(
+      `${A}/service-categories`,
+      category,
+      auth(),
+    )).then((r) => r.category),
+
+  updateServiceCategory: (id: string, patch: AdminServiceCategoryPatch) =>
+    guard(() => api.patch<{ category: AdminServiceCategory }>(
+      `${A}/service-categories/${encodeURIComponent(id)}`,
+      patch,
+      auth(),
+    )).then((r) => r.category),
+
+  deleteServiceCategory: (id: string) =>
+    guard(() => api.del<{ ok: true }>(
+      `${A}/service-categories/${encodeURIComponent(id)}`,
+      auth(),
+    )),
 
   services: () => guard(() => api.get<{ services: AdminService[] }>(`${A}/services`, auth())).then((r) => r.services),
   createService: (s: AdminServiceInput) => guard(() => api.post<{ service: AdminService }>(`${A}/services`, s, auth())).then((r) => r.service),
@@ -78,6 +104,11 @@ export const adminApi = {
     guard(() => api.get<ChatPage>(`${A}/bookings/${encodeURIComponent(id)}/messages?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}`, auth())),
   chatSend: (id: string, body: string, clientMsgId: string) =>
     guard(() => api.post<{ message: ChatMessage }>(`${A}/bookings/${encodeURIComponent(id)}/messages`, { body, clientMsgId }, auth())).then((r) => r.message),
+  chatDeleteMessage: (bookingId: string, messageId: string) =>
+    guard(() => api.del<{ ok: true; id: string }>(
+      `${A}/bookings/${encodeURIComponent(bookingId)}/messages/${encodeURIComponent(messageId)}`,
+      auth(),
+    )),
 
   settings: () => guard(() => api.get<{ settings: AdminSettings }>(`${A}/settings`, auth())).then((r) => r.settings),
   updateSettings: (s: Partial<AdminSettings>) =>

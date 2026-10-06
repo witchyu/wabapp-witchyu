@@ -106,7 +106,7 @@ test('parseLogin', () => {
 
 test('parseServiceCreate / parseServicePatch', () => {
   const ok = parseServiceCreate({ group: 'topic', name: ' สุขภาพ ', price: '129' })
-  assert.deepEqual(ok, { group: 'topic', name: 'สุขภาพ', description: '', price: 129, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false })
+  assert.deepEqual(ok, { group: 'topic', categoryId: undefined, name: 'สุขภาพ', description: '', price: 129, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false })
   assert.equal(code(() => parseServiceCreate({ group: 'nope', name: 'a', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: '', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: 'a', price: 0 })), 'VALIDATION')

@@ -24,6 +24,28 @@ export async function dashboard() {
   const todayCount = await prisma.booking.count({ where: { date: today, ...activeWhere(now) } })
   const pendingCount = await prisma.booking.count({ where: { status: 'pending_payment' } })
   const upcomingCount = await prisma.booking.count({ where: { status: 'confirmed', date: { gte: today } } })
+
+  // Revenue = รายการที่ชำระแล้ว/ยืนยันแล้วเท่านั้น
+  // pending_payment และ cancelled จะไม่ถูกนับเป็นรายได้
+  const paidWhere: Prisma.BookingWhereInput = {
+    status: { in: ['confirmed', 'completed'] },
+  }
+
+  const [todayRevenueAgg, totalRevenueAgg, paidCount] = await prisma.$transaction([
+    prisma.booking.aggregate({
+      where: { ...paidWhere, date: today },
+      _sum: { price: true },
+    }),
+    prisma.booking.aggregate({
+      where: paidWhere,
+      _sum: { price: true },
+    }),
+    prisma.booking.count({ where: paidWhere }),
+  ])
+
+  const todayRevenue = todayRevenueAgg._sum.price ?? 0
+  const totalRevenue = totalRevenueAgg._sum.price ?? 0
+
   const next = await prisma.booking.findMany({
     where: { status: 'confirmed', date: { gte: today } },
     orderBy: [{ date: 'asc' }, { time: 'asc' }],
@@ -31,7 +53,14 @@ export async function dashboard() {
   })
   return {
     today,
-    stats: { todayCount, pendingCount, upcomingCount },
+    stats: {
+      todayCount,
+      pendingCount,
+      upcomingCount,
+      todayRevenue,
+      totalRevenue,
+      paidCount,
+    },
     next: next.map(toBookingDto),
     settings: await readSettings(prisma),
   }
@@ -93,23 +122,91 @@ export async function cancelBooking(id: string) {
   return getBooking(id)
 }
 
+// ลบถาวรได้เฉพาะรายการที่เสร็จแล้วหรือยกเลิกแล้ว
+// ไม่เรียก settleBookings() ที่นี่ เพราะ confirmed ต้องถูกปฏิเสธตามสถานะปัจจุบัน
+export async function deleteBooking(id: string) {
+  return prisma.$transaction(async (tx) => {
+    const cur = await tx.booking.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    })
+
+    if (!cur) throw notFound('รายการจอง')
+
+    if (cur.status !== 'completed' && cur.status !== 'cancelled') {
+      throw new AppError(
+        409,
+        'INVALID_STATUS',
+        'ลบถาวรได้เฉพาะรายการที่เสร็จแล้วหรือยกเลิกแล้ว',
+      )
+    }
+
+    // ลบข้อมูลที่อ้างอิง Booking ก่อน เพราะ Prisma schema
+    // ยังไม่ได้ตั้ง onDelete: Cascade สำหรับ Message/CallSession
+    await tx.message.deleteMany({ where: { bookingId: id } })
+    await tx.callSession.deleteMany({ where: { bookingId: id } })
+    await tx.booking.delete({ where: { id } })
+
+    return { ok: true, id }
+  })
+}
+
 // ---------- บริการ ----------
 export async function listServices() {
-  const rows = await prisma.service.findMany({ orderBy: { sortOrder: 'asc' } })
+  const rows = await prisma.service.findMany({
+    orderBy: { sortOrder: 'asc' },
+    include: { category: true },
+  })
   return rows.map(toAdminServiceDto)
 }
 
 export async function createService(input: ServiceInput) {
-  const last = await prisma.service.aggregate({ _max: { sortOrder: true } })
-  const row = await prisma.service.create({
-    data: { id: `svc-${randomBytes(4).toString('hex')}`, ...input, sortOrder: (last._max.sortOrder ?? 0) + 1 },
+  const categoryId = input.categoryId ?? input.group
+
+  const category = await prisma.serviceCategory.findUnique({
+    where: { id: categoryId },
+    select: { id: true },
   })
+
+  if (!category) {
+    throw new AppError(400, 'CATEGORY_NOT_FOUND', 'ไม่พบหมวดหมู่บริการ')
+  }
+
+  const last = await prisma.service.aggregate({ _max: { sortOrder: true } })
+
+  const row = await prisma.service.create({
+    data: {
+      id: `svc-${randomBytes(4).toString('hex')}`,
+      ...input,
+      categoryId,
+      sortOrder: (last._max.sortOrder ?? 0) + 1,
+    },
+    include: { category: true },
+  })
+
   return toAdminServiceDto(row)
 }
 
 export async function updateService(id: string, patch: Partial<ServiceInput>) {
   try {
-    return toAdminServiceDto(await prisma.service.update({ where: { id }, data: patch }))
+    if (patch.categoryId !== undefined) {
+      const category = await prisma.serviceCategory.findUnique({
+        where: { id: patch.categoryId },
+        select: { id: true },
+      })
+
+      if (!category) {
+        throw new AppError(400, 'CATEGORY_NOT_FOUND', 'ไม่พบหมวดหมู่บริการ')
+      }
+    }
+
+    const row = await prisma.service.update({
+      where: { id },
+      data: patch,
+      include: { category: true },
+    })
+
+    return toAdminServiceDto(row)
   } catch (e) {
     if (isCode(e, 'P2025')) throw notFound('บริการ')
     throw e
@@ -124,6 +221,82 @@ export async function deleteService(id: string) {
     if (isCode(e, 'P2025')) throw notFound('บริการ')
     throw e
   }
+}
+
+
+// ---------- หมวดหมู่บริการ ----------
+export async function listServiceCategories() {
+  return prisma.serviceCategory.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+  })
+}
+
+export async function createServiceCategory(input: {
+  id: string
+  label: string
+  hint: string
+  note: string
+  multi: boolean
+  active: boolean
+  sortOrder: number
+}) {
+  try {
+    return await prisma.serviceCategory.create({ data: input })
+  } catch (e) {
+    if (isCode(e, 'P2002')) {
+      throw new AppError(409, 'CATEGORY_EXISTS', 'มีรหัสหมวดหมู่นี้อยู่แล้ว')
+    }
+    throw e
+  }
+}
+
+export async function updateServiceCategory(
+  id: string,
+  patch: {
+    label?: string
+    hint?: string
+    note?: string
+    multi?: boolean
+    active?: boolean
+    sortOrder?: number
+  },
+) {
+  try {
+    return await prisma.serviceCategory.update({
+      where: { id },
+      data: patch,
+    })
+  } catch (e) {
+    if (isCode(e, 'P2025')) throw notFound('หมวดหมู่บริการ')
+    throw e
+  }
+}
+
+export async function deleteServiceCategory(id: string) {
+  const category = await prisma.serviceCategory.findUnique({
+    where: { id },
+    select: { id: true },
+  })
+
+  if (!category) throw notFound('หมวดหมู่บริการ')
+
+  const serviceCount = await prisma.service.count({
+    where: { categoryId: id },
+  })
+
+  if (serviceCount > 0) {
+    throw new AppError(
+      409,
+      'CATEGORY_IN_USE',
+      `ลบหมวดหมู่นี้ไม่ได้ เพราะมีบริการใช้งานอยู่ ${serviceCount} รายการ`,
+    )
+  }
+
+  await prisma.serviceCategory.delete({
+    where: { id },
+  })
+
+  return { ok: true, id }
 }
 
 // ---------- รอบเวลา ----------
@@ -209,7 +382,29 @@ export async function deleteHoliday(id: number) {
 // ---------- สวิตช์ร้าน ----------
 export const getSettings = () => readSettings(prisma)
 
-export async function updateSettings(patch: { shopOpen?: boolean; callsEnabled?: boolean }) {
-  await prisma.shopSetting.upsert({ where: { id: 1 }, update: patch, create: { id: 1, ...patch } })
+export async function updateSettings(patch: {
+  shopOpen?: boolean
+  callsEnabled?: boolean
+  customerDataRetentionDays?: number
+  bookingRetentionDays?: number
+  chatRetentionDays?: number
+  callRecordRetentionDays?: number
+  systemLogRetentionDays?: number
+}) {
+  await prisma.shopSetting.upsert({
+    where: { id: 1 },
+    update: patch,
+    create: {
+      id: 1,
+      shopOpen: patch.shopOpen ?? true,
+      callsEnabled: patch.callsEnabled ?? true,
+      customerDataRetentionDays: patch.customerDataRetentionDays ?? 30,
+      bookingRetentionDays: patch.bookingRetentionDays ?? 30,
+      chatRetentionDays: patch.chatRetentionDays ?? 10,
+      callRecordRetentionDays: patch.callRecordRetentionDays ?? 10,
+      systemLogRetentionDays: patch.systemLogRetentionDays ?? 7,
+    },
+  })
+
   return readSettings(prisma)
 }

@@ -53,21 +53,36 @@ model User {
   messages     Message[]
 }
 
+model ServiceCategory {
+  id        String    @id
+  label     String
+  hint      String    @default("")
+  note      String    @default("")
+  multi     Boolean   @default(false)
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  services  Service[]
+}
+
 model Service {
-  id          String       @id // เช่น q-3, c-30 (ใช้เป็นรหัสเดียวกับหน้าเว็บ)
+  id          String           @id // เช่น q-3, c-30 (ใช้เป็นรหัสเดียวกับหน้าเว็บ)
   group       ServiceGroup
+  categoryId  String?
+  category    ServiceCategory? @relation(fields: [categoryId], references: [id])
   name        String
-  description String       @default("")
-  price       Int          // บาท (ต่อข้อ ถ้า perQuestion = true)
+  description String           @default("")
+  price       Int // บาท (ต่อข้อ ถ้า perQuestion = true)
   durationMin Int?
-  unlimited   Boolean      @default(false) // จองได้เฉพาะรอบ 22:30
-  perQuestion Boolean      @default(false)
+  unlimited   Boolean          @default(false) // จองได้เฉพาะรอบ 22:30
+  perQuestion Boolean          @default(false)
   questions   String[]
-  active      Boolean      @default(true)
-  recommended Boolean      @default(false)
-  sortOrder   Int          @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  active      Boolean          @default(true)
+  recommended Boolean          @default(false)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }
 
 // รอบเวลา (HH:mm) และจำนวนคิวสูงสุดต่อรอบ
@@ -86,9 +101,9 @@ model Booking {
   serviceName   String
   questionCount Int?
   otherQuestion String?
-  price         Int           // คำนวณฝั่งเซิร์ฟเวอร์เสมอ
-  date          String        // YYYY-MM-DD (เวลาไทย)
-  time          String        // HH:mm
+  price         Int // คำนวณฝั่งเซิร์ฟเวอร์เสมอ
+  date          String // YYYY-MM-DD (เวลาไทย)
+  time          String // HH:mm
   note          String        @default("")
   nickname      String
   fullName      String
@@ -96,7 +111,7 @@ model Booking {
   relationship  String
   isCall        Boolean       @default(false)
   status        BookingStatus @default(pending_payment)
-  expiresAt     DateTime      // หมดเวลาชำระเงิน
+  expiresAt     DateTime // หมดเวลาชำระเงิน
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   messages      Message[]
@@ -117,18 +132,18 @@ model Admin {
 }
 
 model Message {
-  id         String     @id @default(cuid())
-  bookingId  String
-  booking    Booking    @relation(fields: [bookingId], references: [id])
-  senderRole SenderRole
-  userId     String?
-  user       User?      @relation(fields: [userId], references: [id])
-  adminId    String?
-  admin      Admin?     @relation(fields: [adminId], references: [id])
-  body       String
-  clientMsgId String?   // รหัสที่หน้าเว็บสร้างเอง ใช้กันข้อความซ้ำเมื่อส่งใหม่หลังเน็ตหลุด
-  readAt     DateTime?
-  createdAt  DateTime   @default(now())
+  id          String     @id @default(cuid())
+  bookingId   String
+  booking     Booking    @relation(fields: [bookingId], references: [id])
+  senderRole  SenderRole
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
+  adminId     String?
+  admin       Admin?     @relation(fields: [adminId], references: [id])
+  body        String
+  clientMsgId String? // รหัสที่หน้าเว็บสร้างเอง ใช้กันข้อความซ้ำเมื่อส่งใหม่หลังเน็ตหลุด
+  readAt      DateTime?
+  createdAt   DateTime   @default(now())
 
   @@unique([bookingId, clientMsgId])
   @@index([bookingId, createdAt])
@@ -166,8 +181,13 @@ model Holiday {
 
 // สวิตช์ของร้าน (มีแถวเดียว id = 1) — Admin เปิด/ปิดร้าน และเปิด/ปิดรับจองโทร
 model ShopSetting {
-  id           Int      @id @default(1)
-  shopOpen     Boolean  @default(true)
-  callsEnabled Boolean  @default(true)
-  updatedAt    DateTime @updatedAt
+  id                        Int      @id @default(1)
+  shopOpen                  Boolean  @default(true)
+  callsEnabled              Boolean  @default(true)
+  customerDataRetentionDays Int      @default(30)
+  bookingRetentionDays      Int      @default(30)
+  chatRetentionDays         Int      @default(10)
+  callRecordRetentionDays   Int      @default(10)
+  systemLogRetentionDays    Int      @default(7)
+  updatedAt                 DateTime @updatedAt
 }

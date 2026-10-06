@@ -43,6 +43,12 @@ export async function cleanupExpiredData(now = Date.now()) {
       status: {
         in: ['completed', 'cancelled'],
       },
+      messages: {
+        none: {},
+      },
+      calls: {
+        none: {},
+      },
     },
   })
 

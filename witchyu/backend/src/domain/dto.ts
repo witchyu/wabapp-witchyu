@@ -39,9 +39,21 @@ export function toBookingDto(b: BookingRowLike) {
   }
 }
 
+export interface ServiceCategoryRowLike {
+  id: string
+  label: string
+  hint: string
+  note: string
+  multi: boolean
+  active: boolean
+  sortOrder: number
+}
+
 export interface ServiceRowLike {
   id: string
   group: string
+  categoryId?: string | null
+  category?: ServiceCategoryRowLike | null
   name: string
   description: string
   price: number
@@ -76,6 +88,18 @@ export function toAdminServiceDto(s: AdminServiceRowLike) {
   return {
     id: s.id,
     group: s.group,
+    categoryId: s.categoryId ?? null,
+    category: s.category
+      ? {
+          id: s.category.id,
+          label: s.category.label,
+          hint: s.category.hint,
+          note: s.category.note,
+          multi: s.category.multi,
+          active: s.category.active,
+          sortOrder: s.category.sortOrder,
+        }
+      : null,
     name: s.name,
     desc: s.description,
     price: s.price,

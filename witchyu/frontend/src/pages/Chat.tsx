@@ -39,11 +39,57 @@ export default function Chat() {
       {threads && threads.length === 0 && (
         <EmptyState icon={<MessageCircle size={28} />} title="ยังไม่มีแชต" text="แชตกับหมอดูเปิดให้หลังจากจองคิวและชำระเงินแล้ว" action={<button onClick={() => nav('/booking')} className="h-12 rounded-2xl bg-gold px-8 font-semibold text-night">จองคิว</button>} />
       )}
-      {threads && threads.length > 0 && (
-        <div className="px-4 pt-4">
-          <ThreadList threads={threads} role="customer" hrefOf={(t) => `/chat/${t.booking.id}`} titleOf={() => 'Witchyu · หมอดู'} avatarOf={() => <DoctorAvatar size={44} />} />
-        </div>
-      )}
+      {threads && threads.length > 0 && (() => {
+        const upcoming = threads
+          .filter((t) => t.booking.status === 'confirmed')
+          .sort((a, b) => {
+            const aKey = `${a.booking.date} ${a.booking.time}`
+            const bKey = `${b.booking.date} ${b.booking.time}`
+            return aKey.localeCompare(bKey)
+          })
+
+        const completed = threads
+          .filter((t) => t.booking.status === 'completed')
+          .sort((a, b) => {
+            const aStamp = a.lastMessage?.createdAt ?? 0
+            const bStamp = b.lastMessage?.createdAt ?? 0
+            return bStamp - aStamp
+          })
+
+        const threadList = (items: ChatThread[]) => (
+          <ThreadList
+            threads={items}
+            role="customer"
+            hrefOf={(t) => `/chat/${t.booking.id}`}
+            titleOf={() => 'Witchyu · หมอดู'}
+            avatarOf={() => <DoctorAvatar size={44} />}
+          />
+        )
+
+        return (
+          <div className="grid gap-6 px-4 pt-4 pb-6">
+            {upcoming.length > 0 && (
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="font-display text-lg font-semibold">แชตที่กำลังจะถึง</h2>
+                  <span className="text-xs text-mute">{upcoming.length} รายการ</span>
+                </div>
+                {threadList(upcoming)}
+              </section>
+            )}
+
+            {completed.length > 0 && (
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="font-display text-lg font-semibold">แชตที่ผ่านมา</h2>
+                  <span className="text-xs text-mute">{completed.length} รายการ</span>
+                </div>
+                {threadList(completed)}
+              </section>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

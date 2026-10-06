@@ -2,12 +2,28 @@ import { prisma, type Db } from '../db'
 import { computeOpenNow, formatHoursLabel, type HoursFull } from '../domain/shop'
 import { dayOfWeek, shopNow } from '../domain/time'
 
-export interface Settings { shopOpen: boolean; callsEnabled: boolean }
+export interface Settings {
+  shopOpen: boolean
+  callsEnabled: boolean
+  customerDataRetentionDays: number
+  bookingRetentionDays: number
+  chatRetentionDays: number
+  callRecordRetentionDays: number
+  systemLogRetentionDays: number
+}
 
 // ไม่มีแถวตั้งค่า = ค่าเริ่มต้น (เปิดทั้งหมด)
 export async function readSettings(db: Db): Promise<Settings> {
   const row = await db.shopSetting.findUnique({ where: { id: 1 } })
-  return { shopOpen: row?.shopOpen ?? true, callsEnabled: row?.callsEnabled ?? true }
+  return {
+    shopOpen: row?.shopOpen ?? true,
+    callsEnabled: row?.callsEnabled ?? true,
+    customerDataRetentionDays: row?.customerDataRetentionDays ?? 30,
+    bookingRetentionDays: row?.bookingRetentionDays ?? 30,
+    chatRetentionDays: row?.chatRetentionDays ?? 10,
+    callRecordRetentionDays: row?.callRecordRetentionDays ?? 10,
+    systemLogRetentionDays: row?.systemLogRetentionDays ?? 7,
+  }
 }
 
 export async function readAllHours(db: Db): Promise<HoursFull[]> {

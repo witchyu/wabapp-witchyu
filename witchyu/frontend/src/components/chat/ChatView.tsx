@@ -6,7 +6,15 @@ import { dayKey, dayLabel, lastReadOwnId, timeLabel } from '../../utils/chat'
 import { ErrorState } from '../states'
 
 type Conv = ReturnType<typeof useConversation>
-interface Props { role: ChatRole; conv: Conv; title: string; subtitle?: string; avatar: ReactNode; onBack: () => void }
+interface Props {
+  role: ChatRole
+  conv: Conv
+  title: string
+  subtitle?: string
+  avatar: ReactNode
+  onBack: () => void
+  onDeleteMessage?: (message: import('../../types/chat').ChatMessage) => void
+}
 
 // ความสูงที่มองเห็นจริง (ลดลงเมื่อแป้นพิมพ์ขึ้นบน iPhone/iPad) กันช่องพิมพ์ถูกแป้นพิมพ์บัง
 function useVisibleHeight(): number | null {
@@ -21,7 +29,7 @@ function useVisibleHeight(): number | null {
   return h
 }
 
-export default function ChatView({ role, conv, title, subtitle, avatar, onBack }: Props) {
+export default function ChatView({ role, conv, title, subtitle, avatar, onBack, onDeleteMessage }: Props) {
   const { messages, status, error, reload, hasMore, loadingOlder, loadOlder, canSend, cannotSendReason, send, retry, notifyTyping, peerTyping, sendError, clearSendError, connected, peerOnline } = conv
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -123,6 +131,15 @@ export default function ChatView({ role, conv, title, subtitle, avatar, onBack }
                   <div className={`mb-2 flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div className={`flex max-w-[82%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
                       <div className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed ${mine ? 'rounded-br-md bg-gold text-night' : 'rounded-bl-md bg-raised text-ink'} ${m.local ? 'opacity-70' : ''}`}>{m.body}</div>
+                      {role === 'admin' && !m.local && onDeleteMessage && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMessage(m)}
+                          className="mt-0.5 px-1 text-[11px] text-bad underline"
+                        >
+                          ลบข้อความ
+                        </button>
+                      )}
                       <div className="mt-0.5 flex items-center gap-1.5 px-1 text-[11px] text-mute">
                         {m.local === 'sending' && <span>กำลังส่ง…</span>}
                         {m.local === 'failed' && <button onClick={() => retry(m)} className="text-bad underline">ส่งไม่สำเร็จ — แตะเพื่อส่งใหม่</button>}

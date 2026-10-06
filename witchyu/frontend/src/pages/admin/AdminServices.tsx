@@ -7,14 +7,15 @@ import Toggle from '../../components/admin/Toggle'
 import BottomSheet from '../../components/BottomSheet'
 import Modal from '../../components/Modal'
 import { ErrorState, Spinner } from '../../components/states'
-import { GROUPS } from '../../data/services'
 import { useToast } from '../../hooks/useToast'
 import type { ServiceGroup } from '../../types'
 import type { AdminService } from '../../types/admin'
+import AdminServiceCategories from './AdminServiceCategories'
 
 interface Form {
   id: string | null // null = เพิ่มใหม่
   group: ServiceGroup
+  categoryId: string
   name: string
   desc: string
   price: string
@@ -26,22 +27,87 @@ interface Form {
   recommended: boolean
 }
 
-const blank = (group: ServiceGroup = 'question'): Form => ({ id: null, group, name: '', desc: '', price: '', durationMin: '', unlimited: false, perQuestion: false, questionsText: '', active: true, recommended: false })
-const fromService = (s: AdminService): Form => ({ id: s.id, group: s.group, name: s.name, desc: s.desc, price: String(s.price), durationMin: s.durationMin ? String(s.durationMin) : '', unlimited: s.unlimited, perQuestion: s.perQuestion, questionsText: s.questions.join('\n'), active: s.active, recommended: s.recommended })
+const blank = (categoryId = 'question', group: ServiceGroup = 'question'): Form => ({
+  id: null,
+  group,
+  categoryId,
+  name: '',
+  desc: '',
+  price: '',
+  durationMin: '',
+  unlimited: false,
+  perQuestion: false,
+  questionsText: '',
+  active: true,
+  recommended: false,
+})
+
+const fromService = (s: AdminService): Form => ({
+  id: s.id,
+  group: s.group,
+  categoryId: s.categoryId ?? s.group,
+  name: s.name,
+  desc: s.desc,
+  price: String(s.price),
+  durationMin: s.durationMin ? String(s.durationMin) : '',
+  unlimited: s.unlimited,
+  perQuestion: s.perQuestion,
+  questionsText: s.questions.join('\n'),
+  active: s.active,
+  recommended: s.recommended,
+})
 
 const input = 'h-12 w-full rounded-xl border border-line bg-night px-4 text-ink focus:border-gold focus:outline-none'
 
 export default function AdminServices() {
   const toast = useToast()
-  const { data, setData, status, error, reload } = useLoad(() => adminApi.services())
+  const {
+    data,
+    setData,
+    status,
+    error,
+    reload,
+  } = useLoad(() => adminApi.services())
+
+  const {
+    data: categories,
+    status: categoryStatus,
+    error: categoryError,
+    reload: reloadCategories,
+  } = useLoad(() => adminApi.serviceCategories())
+
   const [form, setForm] = useState<Form | null>(null)
   const [saving, setSaving] = useState(false)
   const [del, setDel] = useState<AdminService | null>(null)
 
-  if (status === 'loading') return <Spinner />
-  if (status === 'error' || !data) return <ErrorState title="โหลดบริการไม่สำเร็จ" text={error} onRetry={reload} />
+  if (status === 'loading' || categoryStatus === 'loading') return <Spinner />
 
-  const replace = (s: AdminService) => setData(data.map((x) => (x.id === s.id ? s : x)))
+  if (status === 'error' || !data) {
+    return (
+      <ErrorState
+        title="โหลดบริการไม่สำเร็จ"
+        text={error}
+        onRetry={reload}
+      />
+    )
+  }
+
+  if (categoryStatus === 'error' || !categories) {
+    return (
+      <ErrorState
+        title="โหลดหมวดหมู่บริการไม่สำเร็จ"
+        text={categoryError}
+        onRetry={reloadCategories}
+      />
+    )
+  }
+
+  const activeCategories = categories
+    .filter((x) => x.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+
+  const replace = (s: AdminService) =>
+    setData(data.map((x) => (x.id === s.id ? s : x)))
 
   const toggleActive = async (s: AdminService, active: boolean) => {
     replace({ ...s, active }) // แสดงผลทันที ย้อนกลับถ้าไม่สำเร็จ
@@ -60,8 +126,18 @@ export default function AdminServices() {
     if (!Number.isInteger(price) || price < 1) return toast('กรุณากรอกราคาเป็นจำนวนเต็มบาท', 'error')
     const duration = form.durationMin.trim() === '' ? null : Number(form.durationMin)
     if (duration !== null && (!Number.isInteger(duration) || duration < 1)) return toast('ระยะเวลาต้องเป็นจำนวนนาทีเต็ม', 'error')
+    if (!form.categoryId) {
+      return toast('กรุณาเลือกหมวดหมู่บริการ', 'error')
+    }
+
+    const category = categories.find((x) => x.id === form.categoryId)
+    if (!category) {
+      return toast('ไม่พบหมวดหมู่บริการที่เลือก', 'error')
+    }
+
     const body = {
       group: form.group,
+      categoryId: form.categoryId,
       name: form.name.trim(),
       desc: form.desc.trim(),
       price,
@@ -116,12 +192,20 @@ export default function AdminServices() {
       </div>
 
       <div className="grid gap-7">
-        {GROUPS.map((g) => {
-          const list = data.filter((s) => s.group === g.id)
+        {activeCategories.map((category) => {
+          const list = data.filter((s) => s.categoryId === category.id)
           if (list.length === 0) return null
+
           return (
-            <section key={g.id}>
-              <h2 className="mb-2 font-display text-base font-semibold">{g.label}</h2>
+            <section key={category.id}>
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="font-display text-base font-semibold">{category.label}</h2>
+                {category.multi && (
+                  <span className="rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">
+                    หลายรายการ
+                  </span>
+                )}
+              </div>
               <ul className="grid gap-2 md:grid-cols-2">
                 {list.map((s) => (
                   <li key={s.id} className={`flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 ${s.active ? '' : 'opacity-60'}`}>
@@ -143,9 +227,29 @@ export default function AdminServices() {
       <BottomSheet open={!!form} title={form?.id ? 'แก้ไขบริการ' : 'เพิ่มบริการ'} onClose={() => setForm(null)}>
         {form && (
           <div className="grid gap-3 text-sm">
-            <label className="grid gap-1.5">หมวด
-              <select className={input} value={form.group} onChange={(e) => set({ group: e.target.value as ServiceGroup })}>
-                {GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+            <label className="grid gap-1.5">
+              หมวดหมู่บริการ
+              <select
+                className={input}
+                value={form.categoryId}
+                onChange={(e) => {
+                  const categoryId = e.target.value
+                  const selected = categories.find((x) => x.id === categoryId)
+
+                  set({
+                    categoryId,
+                    // รักษา legacy group ให้ตรงกับ category เดิมเมื่อเป็นหมวดเก่า
+                    group: (selected?.id ?? form.group) as ServiceGroup,
+                  })
+                }}
+              >
+                {categories
+                  .filter((category) => category.active || category.id === form.categoryId)
+                  .map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.label}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="grid gap-1.5">ชื่อบริการ<input className={input} value={form.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} /></label>
@@ -176,6 +280,8 @@ export default function AdminServices() {
       <Modal open={!!del} danger title="ลบบริการนี้?" confirmLabel="ลบ" cancelLabel="ไม่ลบ" onCancel={() => setDel(null)} onConfirm={remove}>
         “{del?.name}” จะหายจากหน้าลูกค้าถาวร (การจองเก่าที่เคยจองบริการนี้ยังเห็นชื่อและราคาตามเดิม) ถ้าแค่อยากหยุดขายชั่วคราว ให้ใช้สวิตช์ปิดแทนการลบ
       </Modal>
+
+      <AdminServiceCategories />
     </div>
   )
 }

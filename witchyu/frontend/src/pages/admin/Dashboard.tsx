@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarCheck, Clock, Hourglass } from 'lucide-react'
+import { CalendarCheck, Clock, Hourglass, WalletCards } from 'lucide-react'
 import { adminApi } from '../../services/adminApi'
 import { errorMessage } from '../../services/api'
 import { useLoad } from '../../components/admin/useLoad'
@@ -37,15 +37,39 @@ export default function Dashboard() {
     }
   }
 
+  const updateRetention = async (
+    field:
+      | 'customerDataRetentionDays'
+      | 'bookingRetentionDays'
+      | 'chatRetentionDays'
+      | 'callRecordRetentionDays'
+      | 'systemLogRetentionDays',
+    value: string,
+  ) => {
+    if (busy) return
+
+    const days = Number(value)
+
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      toast('จำนวนวันต้องเป็นจำนวนเต็ม 1–3650 วัน', 'error')
+      return
+    }
+
+    await save({ [field]: days })
+  }
+
   const stats = [
     { icon: CalendarCheck, label: 'คิววันนี้', value: data.stats.todayCount },
     { icon: Hourglass, label: 'รอชำระเงิน', value: data.stats.pendingCount },
     { icon: Clock, label: 'ยืนยันแล้ว (ยังไม่ถึงเวลา)', value: data.stats.upcomingCount },
+    { icon: WalletCards, label: 'รายได้วันนี้', value: baht(data.stats.todayRevenue) },
+    { icon: WalletCards, label: 'รายได้รวม', value: baht(data.stats.totalRevenue) },
+    { icon: CalendarCheck, label: 'รายการที่สร้างรายได้', value: data.stats.paidCount },
   ]
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl border border-line bg-surface p-4">
             <Icon size={20} className="text-gold" />
@@ -69,6 +93,82 @@ export default function Dashboard() {
             <div className="text-sm text-mute">{data.settings.callsEnabled ? 'ลูกค้าจองแพ็กเกจโทรได้' : 'ปิดอยู่ — ลูกค้าจองแพ็กเกจโทรไม่ได้'}</div>
           </div>
           <Toggle label="เปิดรับจองโทร" checked={data.settings.callsEnabled} disabled={busy} onChange={(v) => save({ callsEnabled: v })} />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-4">
+        <div className="mb-4">
+          <h2 className="font-display text-lg font-semibold">
+            การเก็บข้อมูล
+          </h2>
+          <p className="mt-1 text-sm text-mute">
+            กำหนดจำนวนวันที่ระบบจะเก็บข้อมูลแต่ละประเภท
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            {
+              field: 'customerDataRetentionDays' as const,
+              label: 'ข้อมูลลูกค้า',
+              value: data.settings.customerDataRetentionDays,
+            },
+            {
+              field: 'bookingRetentionDays' as const,
+              label: 'ข้อมูลการจอง',
+              value: data.settings.bookingRetentionDays,
+            },
+            {
+              field: 'chatRetentionDays' as const,
+              label: 'ข้อความแชต',
+              value: data.settings.chatRetentionDays,
+            },
+            {
+              field: 'callRecordRetentionDays' as const,
+              label: 'ประวัติการโทร',
+              value: data.settings.callRecordRetentionDays,
+            },
+            {
+              field: 'systemLogRetentionDays' as const,
+              label: 'System Log',
+              value: data.settings.systemLogRetentionDays,
+            },
+          ].map(({ field, label, value }) => (
+            <label
+              key={field}
+              className="flex items-center gap-3 rounded-xl bg-night/60 p-3"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{label}</span>
+                <span className="text-xs text-mute">
+                  เก็บไว้ {value} วัน
+                </span>
+              </span>
+
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                inputMode="numeric"
+                defaultValue={value}
+                disabled={busy}
+                className="h-11 w-24 rounded-xl border border-line bg-night px-3 text-center text-ink focus:border-gold focus:outline-none disabled:opacity-60"
+                onBlur={(e) => {
+                  const next = e.currentTarget.value
+                  if (Number(next) !== value) {
+                    void updateRetention(field, next)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+              />
+
+              <span className="text-sm text-mute">วัน</span>
+            </label>
+          ))}
         </div>
       </section>
 
