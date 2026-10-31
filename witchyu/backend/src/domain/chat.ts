@@ -1,7 +1,6 @@
 import { AppError } from './errors'
 
 export type ChatRole = 'customer' | 'admin'
-export const MAX_BODY = 1000
 export const HISTORY_DEFAULT = 30
 export const HISTORY_MAX = 50
 
@@ -12,7 +11,6 @@ export function parseMessageBody(v: unknown): string {
   // ตัดอักขระควบคุมที่มองไม่เห็น (เก็บขึ้นบรรทัดใหม่/แท็บไว้)
   const t = v.replace(/\r\n/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim()
   if (!t) throw bad('VALIDATION', 'กรุณาพิมพ์ข้อความ')
-  if (t.length > MAX_BODY) throw bad('VALIDATION', `ข้อความยาวเกินไป (ไม่เกิน ${MAX_BODY} ตัวอักษร)`)
   return t
 }
 

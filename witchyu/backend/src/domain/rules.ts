@@ -18,6 +18,7 @@ export interface ServiceRow {
   unlimited: boolean
   perQuestion: boolean
   active: boolean
+  category?: { multi: boolean; active?: boolean } | null
 }
 
 export interface Selection {
@@ -41,7 +42,9 @@ export function resolveSelection(
     if (!s.active) throw new AppError(422, 'SERVICE_UNAVAILABLE', `บริการ "${s.name}" ปิดให้บริการชั่วคราว`)
     services.push(s)
   }
-  if (services.length > 1 && !services.every((s) => MULTI_GROUPS.includes(s.group))) {
+  if (services.length > 1 && !services.every((s) =>
+    s.category ? s.category.active !== false && s.category.multi : MULTI_GROUPS.includes(s.group)
+  )) {
     throw new AppError(422, 'SELECTION_INVALID', 'บริการนี้เลือกหลายรายการพร้อมกันไม่ได้')
   }
   const isCall = services.some((s) => s.group === 'call')

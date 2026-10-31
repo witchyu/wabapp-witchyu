@@ -1,3 +1,5 @@
+import { safeCreateNotification } from './notificationService'
+import { emitBookingNew } from '../socket/realtime'
 import { Prisma } from '@prisma/client'
 import { config } from '../config'
 import { prisma } from '../db'
@@ -11,19 +13,72 @@ import type { CreateBookingInput, UpdateBookingInput } from '../domain/validatio
 import { loadDaySlots } from './dayService'
 import { readSettings } from './shopService'
 
-// จองรอบเดียวกันพร้อมกัน: ใช้ Transaction ระดับ Serializable — ถ้าชนกัน Postgres จะยกเลิกฝั่งหนึ่ง (P2034)
-// แล้วลองใหม่ ซึ่งรอบถัดไปจะเห็นว่ารอบเต็มแล้วและตอบ SLOT_FULL
-async function serializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, attempts = 5): Promise<T> {
-  for (let i = 0; ; i++) {
-    try {
-      return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
-    } catch (e) {
-      const code = (e as { code?: string }).code
-      if ((code === 'P2034' || code === 'P2002') && i < attempts - 1) continue
-      if (code === 'P2034') throw new AppError(409, 'BUSY', 'ระบบกำลังยุ่ง กรุณาลองอีกครั้ง')
-      throw e
-    }
+// ล็อกแถว TimeSlot ให้ Customer Booking และ Admin Capacity ใช้ Lock เดียวกัน
+// ใช้ ReadCommitted เพื่อให้คำสั่งอ่านหลังได้ Lock เห็น Booking ล่าสุดที่ Commit แล้ว
+async function lockTimeSlot(tx: Prisma.TransactionClient, time: string): Promise<void> {
+  await tx.$queryRaw`
+    SELECT "id"
+    FROM "TimeSlot"
+    WHERE "time" = ${time}
+    FOR UPDATE
+  `
+}
+
+// ล็อกเลข Booking ID แยกตามวันที่ ป้องกันการสร้างเลขเดียวกันพร้อมกัน
+async function lockBookingDate(tx: Prisma.TransactionClient, date: string): Promise<void> {
+  await tx.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtext(${"witchyu-booking-id:" + date}))
+  `
+}
+
+let bookingTransactionQueue: Promise<void> = Promise.resolve()
+
+async function withBookingTransactionLock<T>(
+  task: () => Promise<T>
+): Promise<T> {
+  const previous = bookingTransactionQueue
+  let release!: () => void
+
+  bookingTransactionQueue = new Promise<void>((resolve) => {
+    release = resolve
+  })
+
+  await previous
+
+  try {
+    return await task()
+  } finally {
+    release()
   }
+}
+
+async function serializable<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  attempts = 5
+): Promise<T> {
+  return withBookingTransactionLock(async () => {
+    for (let i = 0; ; i++) {
+      try {
+        return await prisma.$transaction(fn, {
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+          maxWait: 15000,
+          timeout: 20000,
+        })
+      } catch (e) {
+        const code = (e as { code?: string }).code
+
+        if ((code === 'P2034' || code === 'P2002') && i < attempts - 1) {
+          continue
+        }
+
+        if (code === 'P2034' || code === 'P2002') {
+          throw new AppError(409, 'BUSY', 'ระบบกำลังยุ่ง กรุณาลองอีกครั้ง')
+        }
+
+        throw e
+      }
+    }
+  })
 }
 
 const mine = (id: string, clientId: string) => ({ id, user: { clientId } })
@@ -40,12 +95,18 @@ export async function createBooking(clientId: string, input: CreateBookingInput)
     const nowMs = Date.now()
     const settings = await readSettings(tx)
     if (!settings.shopOpen) throw new AppError(409, 'SHOP_CLOSED', 'ขณะนี้ร้านปิดรับจองคิว')
-    const all = await tx.service.findMany({ where: { id: { in: input.serviceIds } } })
+    const all = await tx.service.findMany({
+      where: { id: { in: input.serviceIds } },
+      include: { category: true },
+    })
     const sel = resolveSelection(all, input, settings.callsEnabled)
+
+    await lockTimeSlot(tx, input.time)
 
     const day = await loadDaySlots(tx, input.date, { unlimited: sel.services.some((s) => s.unlimited), nowMs })
     assertSlotAvailable(day, input.time)
 
+    await lockBookingDate(tx, input.date)
     const sameDay = await tx.booking.findMany({ where: { date: input.date }, select: { id: true } })
     const id = nextBookingId(sameDay.map((b) => b.id), input.date)
 
@@ -78,7 +139,16 @@ export async function createBooking(clientId: string, input: CreateBookingInput)
       },
     })
   })
-  return toBookingDto(booking)
+  const dto = toBookingDto(booking)
+  emitBookingNew(dto)
+  await safeCreateNotification({
+    clientId,
+    type: 'booking',
+    title: 'ได้รับรายการจองแล้ว',
+    message: `${booking.serviceName} · ${booking.date} เวลา ${booking.time} น. กรุณาชำระเงินเพื่อยืนยันคิว`,
+    data: { bookingId: booking.id, status: booking.status },
+  })
+  return dto
 }
 
 export async function listBookings(clientId: string) {
@@ -115,6 +185,7 @@ export async function updateBooking(clientId: string, id: string, patch: UpdateB
     }
     if (patch.date && patch.time && (patch.date !== cur.date || patch.time !== cur.time)) {
       const services = await tx.service.findMany({ where: { id: { in: cur.serviceIds } } })
+      await lockTimeSlot(tx, patch.time)
       const day = await loadDaySlots(tx, patch.date, {
         unlimited: services.some((s) => s.unlimited),
         nowMs,
@@ -143,7 +214,15 @@ export async function cancelBooking(clientId: string, id: string) {
     data: { status: 'cancelled' },
   })
   if (r.count === 0) throw new AppError(409, 'INVALID_STATUS', 'รายการนี้ยกเลิกไม่ได้แล้ว')
-  return toBookingDto(await findOwned(prisma, id, clientId))
+  const cancelled = await findOwned(prisma, id, clientId)
+  await safeCreateNotification({
+    clientId,
+    type: 'booking',
+    title: 'ยกเลิกการจองแล้ว',
+    message: `รายการ ${cancelled.id} ถูกยกเลิกเรียบร้อยแล้ว`,
+    data: { bookingId: cancelled.id, status: 'cancelled' },
+  })
+  return toBookingDto(cancelled)
 }
 
 // ชำระเงินจำลอง (เฉพาะตอนพัฒนา) — Phase 7 ตัดทิ้งและให้ Webhook ของ Payment Provider เป็นผู้ยืนยัน
@@ -162,23 +241,66 @@ export async function mockPay(clientId: string, id: string) {
 }
 
 // รอชำระเกินกำหนด → ยกเลิก (คืนรอบเวลา) / ยืนยันแล้วและเลยเวลานัด → เสร็จแล้ว
-export async function settleBookings(): Promise<void> {
+// ป้องกันคำขอพร้อมกันเรียก Settlement ซ้ำใน Node.js Process เดียว
+let settlementInFlight: Promise<void> | null = null
+let lastSettlementAt = 0
+const SETTLEMENT_COOLDOWN_MS = 5_000
+
+async function runSettlement(): Promise<void> {
   const now = new Date()
   await prisma.booking.updateMany({
-    where: { status: 'pending_payment', expiresAt: { lte: now } },
+    where: {
+      status: 'pending_payment',
+      expiresAt: { lte: now },
+      paymentProofs: { none: { status: 'pending' } },
+    },
     data: { status: 'cancelled' },
   })
+
   const today = shopNow(now.getTime()).date
   const due = await prisma.booking.findMany({
     where: { status: 'confirmed', date: { lte: today } },
     select: { id: true, date: true, time: true, serviceIds: true },
   })
+
   if (due.length === 0) return
-  const services = await prisma.service.findMany({ select: { id: true, durationMin: true, unlimited: true } })
+
+  const services = await prisma.service.findMany({
+    select: { id: true, durationMin: true, unlimited: true },
+  })
+
   const finished = due
-    .filter((b) => bookingEndMs(b.date, b.time, services.filter((s) => b.serviceIds.includes(s.id))) <= now.getTime())
+    .filter((b) =>
+      bookingEndMs(
+        b.date,
+        b.time,
+        services.filter((s) => b.serviceIds.includes(s.id)),
+      ) <= now.getTime(),
+    )
     .map((b) => b.id)
+
   if (finished.length > 0) {
-    await prisma.booking.updateMany({ where: { id: { in: finished }, status: 'confirmed' }, data: { status: 'completed' } })
+    await prisma.booking.updateMany({
+      where: { id: { in: finished }, status: 'confirmed' },
+      data: { status: 'completed' },
+    })
+  }
+}
+
+export async function settleBookings(): Promise<void> {
+  if (settlementInFlight) return settlementInFlight
+
+  if (Date.now() - lastSettlementAt < SETTLEMENT_COOLDOWN_MS) return
+
+  const task = runSettlement()
+  settlementInFlight = task
+
+  try {
+    await task
+    lastSettlementAt = Date.now()
+  } finally {
+    if (settlementInFlight === task) {
+      settlementInFlight = null
+    }
   }
 }

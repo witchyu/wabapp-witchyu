@@ -12,6 +12,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return res.status(err.status).json({ error: { code: err.code, message: err.message } })
   }
   const e = err as { type?: string; status?: number; code?: string }
+  if (e?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: { code: 'FILE_TOO_LARGE', message: 'ไฟล์ต้องมีขนาดไม่เกิน 2 MB' } })
+  }
   if (e?.type === 'entity.parse.failed') {
     return res.status(400).json({ error: { code: 'BAD_JSON', message: 'รูปแบบข้อมูลไม่ถูกต้อง' } })
   }

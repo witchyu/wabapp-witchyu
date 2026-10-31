@@ -14,6 +14,10 @@ adminRoutes.get('/dashboard', c.dashboard)
 
 adminRoutes.get('/bookings', c.listBookings)
 adminRoutes.get('/bookings/:id', c.getBooking)
+
+adminRoutes.get('/bookings/:id/payment-slip', c.getPaymentProof)
+adminRoutes.post('/bookings/:id/payment-review', c.reviewPaymentProof)
+adminRoutes.delete('/bookings/:id/payment-slip', c.deletePaymentProof)
 adminRoutes.post('/bookings/:id/confirm', c.confirmBooking)
 adminRoutes.post('/bookings/:id/cancel', c.cancelBooking)
 adminRoutes.delete('/bookings/:id', c.deleteBooking)

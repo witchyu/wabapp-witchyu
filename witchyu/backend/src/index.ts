@@ -1,3 +1,4 @@
+import { systemLogger } from './services/systemLogger'
 import { createServer } from 'node:http'
 import { createApp } from './app'
 import { config } from './config'
@@ -12,15 +13,26 @@ const io = initSocket(httpServer) // Socket.IO ใช้พอร์ตเดี
 httpServer.listen(config.port, '0.0.0.0', () => {
   console.log(`Witchyu API + realtime listening on :${config.port}`)
 
-  // Cleanup ทำเพียงครั้งเดียวตอน server เริ่ม ไม่ใช้ timer
-  // เพื่อไม่ปลุก Neon เป็นระยะโดยไม่จำเป็น
-  cleanupExpiredData()
-    .then((result) => {
+  let cleanupRunning = false
+  const runRetentionCleanup = async () => {
+    if (cleanupRunning) return
+    cleanupRunning = true
+    try {
+      const result = await cleanupExpiredData()
       console.log('[retention] cleanup completed', result)
-    })
-    .catch((error) => {
+    void systemLogger.info('retention.cleanup', JSON.stringify(result))
+    } catch (error) {
       console.error('[retention] cleanup failed', error)
-    })
+    void systemLogger.error('retention.cleanup.failed', error instanceof Error ? error.message : String(error))
+    } finally {
+      cleanupRunning = false
+    }
+  }
+  void runRetentionCleanup()
+  const retentionTimer = setInterval(() => {
+    void runRetentionCleanup()
+  }, 24 * 60 * 60 * 1000)
+  retentionTimer.unref()
 })
 
 // หมายเหตุ: ไม่มี timer ยิงฐานข้อมูลเป็นระยะ เพื่อให้ Neon ปิดเครื่องได้เมื่อไม่มีคนใช้ (ประหยัดโควตาฟรี)

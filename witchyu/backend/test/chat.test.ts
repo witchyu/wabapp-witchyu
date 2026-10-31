@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppError } from '../src/domain/errors'
 import {
-  MAX_BODY, canSend, cannotSendReason, decodeCursor, encodeCursor, parseBookingIdParam, parseClientMsgId,
+  canSend, cannotSendReason, decodeCursor, encodeCursor, parseBookingIdParam, parseClientMsgId,
   parseHistoryQuery, parseMessageBody, peerOf, toMessageDto,
 } from '../src/domain/chat'
 import { LoginLimiter } from '../src/domain/loginLimiter'
@@ -12,7 +12,7 @@ const code = (fn: () => unknown) => {
   return null
 }
 
-test('parseMessageBody: trims, normalizes, strips control chars, enforces length', () => {
+test('parseMessageBody: trims, normalizes, strips control chars, accepts long messages', () => {
   assert.equal(parseMessageBody('  สวัสดีค่ะ  '), 'สวัสดีค่ะ')
   assert.equal(parseMessageBody('a\r\nb'), 'a\nb')
   assert.equal(parseMessageBody('hi\u0000there\u0007'), 'hithere')
@@ -21,8 +21,8 @@ test('parseMessageBody: trims, normalizes, strips control chars, enforces length
   assert.equal(code(() => parseMessageBody('\u0000\u0001')), 'VALIDATION')
   assert.equal(code(() => parseMessageBody(undefined)), 'VALIDATION')
   assert.equal(code(() => parseMessageBody(123)), 'VALIDATION')
-  assert.equal(parseMessageBody('x'.repeat(MAX_BODY)).length, MAX_BODY)
-  assert.equal(code(() => parseMessageBody('x'.repeat(MAX_BODY + 1))), 'VALIDATION')
+  const longMessage = 'x'.repeat(100_000)
+  assert.equal(parseMessageBody(longMessage), longMessage)
   // HTML ไม่ถูกแก้ไข (หน้าเว็บ render เป็นข้อความล้วน ไม่ใช่ HTML)
   assert.equal(parseMessageBody('<b>x</b>'), '<b>x</b>')
 })

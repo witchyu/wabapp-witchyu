@@ -39,10 +39,18 @@ enum CallStatus {
   failed
 }
 
+enum PaymentProofStatus {
+  pending
+  approved
+  rejected
+}
+
 // ลูกค้า — Phase 3 ระบุตัวด้วย clientId ที่สร้างในเบราว์เซอร์ (ยังไม่มีล็อกอิน) Phase 8 เปลี่ยนเป็นบัญชีจริง
 model User {
   id           String    @id @default(cuid())
   clientId     String    @unique
+  email        String?   @unique
+  passwordHash String?
   nickname     String
   fullName     String
   age          Int
@@ -94,9 +102,9 @@ model TimeSlot {
 }
 
 model Booking {
-  id            String        @id // WY-YYYYMMDD-NNN
+  id            String         @id // WY-YYYYMMDD-NNN
   userId        String
-  user          User          @relation(fields: [userId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
   serviceIds    String[]
   serviceName   String
   questionCount Int?
@@ -104,18 +112,19 @@ model Booking {
   price         Int // คำนวณฝั่งเซิร์ฟเวอร์เสมอ
   date          String // YYYY-MM-DD (เวลาไทย)
   time          String // HH:mm
-  note          String        @default("")
+  note          String         @default("")
   nickname      String
   fullName      String
   age           Int
   relationship  String
-  isCall        Boolean       @default(false)
-  status        BookingStatus @default(pending_payment)
+  isCall        Boolean        @default(false)
+  status        BookingStatus  @default(pending_payment)
   expiresAt     DateTime // หมดเวลาชำระเงิน
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   messages      Message[]
   calls         CallSession[]
+  paymentProofs PaymentProof[]
 
   @@index([date, time])
   @@index([userId])
@@ -123,12 +132,32 @@ model Booking {
 }
 
 model Admin {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  passwordHash String
-  displayName  String
-  createdAt    DateTime  @default(now())
-  messages     Message[]
+  id                    String         @id @default(cuid())
+  username              String         @unique
+  passwordHash          String
+  displayName           String
+  createdAt             DateTime       @default(now())
+  messages              Message[]
+  reviewedPaymentProofs PaymentProof[]
+}
+
+model PaymentProof {
+  id                String             @id @default(cuid())
+  bookingId         String
+  booking           Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mimeType          String
+  data              Bytes
+  originalName      String
+  size              Int
+  status            PaymentProofStatus @default(pending)
+  submittedAt       DateTime           @default(now())
+  reviewedAt        DateTime?
+  reviewNote        String?
+  reviewedByAdminId String?
+  reviewedBy        Admin?             @relation(fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, status])
+  @@index([submittedAt])
 }
 
 model Message {
@@ -190,4 +219,49 @@ model ShopSetting {
   callRecordRetentionDays   Int      @default(10)
   systemLogRetentionDays    Int      @default(7)
   updatedAt                 DateTime @updatedAt
+}
+
+enum NotificationType {
+  booking
+  payment
+  reminder
+  chat
+  system
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  clientId  String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([clientId, readAt])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  bookingEnabled  Boolean  @default(true)
+  paymentEnabled  Boolean  @default(true)
+  reminderEnabled Boolean  @default(true)
+  chatEnabled     Boolean  @default(true)
+  systemEnabled   Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  event     String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([level, createdAt])
 }

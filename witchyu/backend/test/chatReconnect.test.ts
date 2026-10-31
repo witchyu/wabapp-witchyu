@@ -89,7 +89,7 @@ const makeBooking = async (userId: string) => {
 
   const booking = await prisma.booking.create({
     data: {
-      id: `WY-20991229-${Date.now()}-${String(bookingSequence).padStart(3, '0')}`,
+      id: `WY-20991229-${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`,
       userId,
       serviceIds: ['test-service'],
       serviceName: 'Reconnect Test Service',
@@ -118,7 +118,7 @@ const connect = async (
 ) => {
   const socket = connectClient(url, {
     transports: ['websocket'],
-    auth,
+    auth: (cb: (data: Record<string, string>) => void) => cb(auth),
     reconnection,
     reconnectionAttempts: 10,
     reconnectionDelay: 200,
@@ -136,7 +136,7 @@ const joinBooking = async (
   socket: ClientSocket,
   bookingId: string,
 ) => {
-  const result = await new Promise<{ ok?: boolean; error?: unknown }>((resolve) => {
+  const result = await new Promise<{ ok?: boolean; code?: string; message?: string }>((resolve) => {
     socket.emit(
       'chat:join',
       { bookingId },
@@ -147,7 +147,7 @@ const joinBooking = async (
   assert.equal(
     result.ok,
     true,
-    `chat:join failed: ${JSON.stringify(result.error)}`,
+    `chat:join failed: ${JSON.stringify(result)}`,
   )
 }
 

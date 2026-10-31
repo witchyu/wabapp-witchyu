@@ -1,4 +1,7 @@
 import { Router } from 'express'
+import multer from 'multer'
+import { AppError } from '../domain/errors'
+import * as paymentProof from '../controllers/paymentProofController'
 import { prisma } from '../db'
 import { asyncHandler } from '../middleware/asyncHandler'
 import { requireClientId } from '../middleware/clientId'
@@ -7,8 +10,25 @@ import * as booking from '../controllers/bookingController'
 import { adminRoutes } from './admin'
 import { customerChat } from '../controllers/chatController'
 import { getPublicShop } from '../services/shopService'
+import { customerAuthRoutes } from './customerAuth'
+import { notificationRoutes } from './notifications'
+
+
+const paymentSlipUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.mimetype)) {
+      return callback(new AppError(415, 'UNSUPPORTED_FILE', 'รองรับเฉพาะ JPG, PNG และ WebP'))
+    }
+    callback(null, true)
+  },
+}).single('slip')
 
 export const api = Router()
+api.use('/auth', customerAuthRoutes)
+api.use('/notifications', notificationRoutes)
 
 // ไม่แตะฐานข้อมูล: ตัว monitor ที่ยิงถี่ ๆ จะไม่ทำให้ Neon ตื่นค้างจนโควตาชั่วโมงคอมพิวต์หมด
 api.get('/health', (_req, res) => {
@@ -31,7 +51,9 @@ bookings.get('/', booking.list)
 bookings.get('/:id', booking.get)
 bookings.patch('/:id', booking.update)
 bookings.post('/:id/cancel', booking.cancel)
-bookings.post('/:id/mock-pay', booking.mockPay)
+bookings.post('/:id/payment-slip', paymentSlipUpload, paymentProof.upload)
+bookings.get('/:id/payment-slip', paymentProof.list)
+bookings.delete('/:id/payment-slip', paymentProof.remove)
 bookings.get('/:id/messages', customerChat.history)
 bookings.post('/:id/messages', customerChat.send)
 api.use('/bookings', bookings)

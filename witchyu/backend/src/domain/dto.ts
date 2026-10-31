@@ -69,6 +69,16 @@ export function toServiceDto(s: ServiceRowLike) {
   return {
     id: s.id,
     group: s.group,
+    categoryId: s.categoryId ?? s.group,
+    category: s.category ? {
+      id: s.category.id,
+      label: s.category.label,
+      hint: s.category.hint,
+      note: s.category.note,
+      multi: s.category.multi,
+      active: s.category.active,
+      sortOrder: s.category.sortOrder,
+    } : null,
     name: s.name,
     desc: s.description,
     price: s.price,

@@ -1,3 +1,4 @@
+import { safeCreateNotification } from './notificationService'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../db'
 import { toBookingDto } from '../domain/dto'
@@ -117,6 +118,17 @@ export async function sendMessage(viewer: Viewer, bookingId: string, body: strin
   }
   const dto = toMessageDto(row)
   emitMessageNew(bookingId, booking.user.clientId, dto)
+
+  if (viewer.role === 'admin') {
+    await safeCreateNotification({
+      clientId: booking.user.clientId,
+      type: 'chat',
+      title: 'มีข้อความใหม่จากหมอดู',
+      message: body.length > 90 ? `${body.slice(0, 87)}...` : body,
+      data: { bookingId, messageId: row.id },
+    })
+  }
+
   return dto
 }
 

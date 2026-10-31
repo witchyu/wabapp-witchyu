@@ -7,14 +7,15 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js .test-build/test/chat.test.js .test-build/test/adminDeleteBooking.test.js .test-build/test/adminRevenue.test.js .test-build/test/adminChatDelete.test.js .test-build/test/adminSettings.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/domain.test.js .test-build/test/admin.test.js .test-build/test/chat.test.js .test-build/test/adminDeleteBooking.test.js .test-build/test/adminRevenue.test.js .test-build/test/adminChatDelete.test.js .test-build/test/adminSettings.test.js .test-build/test/socketRealtime.test.js .test-build/test/chatHistory.test.js .test-build/test/chatPresence.test.js .test-build/test/chatReadStatus.test.js .test-build/test/chatReconnect.test.js .test-build/test/notifications.test.js .test-build/test/bookingConcurrency.test.js .test-build/test/chatTyping.test.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "admin:create": "tsx prisma/create-admin.ts"
+    "admin:create": "tsx prisma/create-admin.ts",
+    "test:concurrency": "tsc -p tsconfig.test.json && node --require ./test/setupConcurrencyEnv.cjs --test .test-build/test/bookingConcurrency.test.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -24,13 +25,16 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "multer": "^2.5.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.17.0",
     "prisma": "^5.22.0",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.19.2",
     "typescript": "~5.6.3"
   }

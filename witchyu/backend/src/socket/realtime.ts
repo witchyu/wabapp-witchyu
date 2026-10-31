@@ -6,12 +6,17 @@ export const setIo = (server: Server | null) => { io = server }
 export const getIo = () => io
 
 export const bookingRoom = (bookingId: string) => `booking:${bookingId}`
+export const callRoom = (bookingId: string) => `call:${bookingId}`
 export const userRoom = (clientId: string) => `user:${clientId}`
 export const ADMINS_ROOM = 'admins'
 
 // ส่งครั้งเดียวต่อ socket แม้อยู่หลายห้อง: ห้องของการจอง + เจ้าของ (ทุกอุปกรณ์ของลูกค้า) + แอดมินทั้งหมด
 function targets(bookingId: string, ownerClientId: string) {
   return io?.to(bookingRoom(bookingId)).to(userRoom(ownerClientId)).to(ADMINS_ROOM)
+}
+
+export function emitBookingNew(booking: unknown) {
+  io?.to(ADMINS_ROOM).emit('booking:new', booking)
 }
 
 export function emitMessageNew(bookingId: string, ownerClientId: string, message: unknown) {

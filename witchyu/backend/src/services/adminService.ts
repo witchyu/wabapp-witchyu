@@ -97,17 +97,13 @@ export async function getBooking(id: string) {
   return toBookingDto(b)
 }
 
-// ยืนยันด้วยมือ: เฉพาะรายการที่รอชำระเงิน (เช่น แอดมินตรวจเห็นว่าเงินเข้าแล้ว)
-export async function confirmBooking(id: string) {
-  await settleBookings()
-  const r = await prisma.booking.updateMany({ where: { id, status: 'pending_payment' }, data: { status: 'confirmed' } })
-  if (r.count === 0) {
-    const cur = await prisma.booking.findUnique({ where: { id } })
-    if (!cur) throw notFound('รายการจอง')
-    if (cur.status === 'confirmed') return toBookingDto(cur)
-    throw new AppError(409, 'INVALID_STATUS', 'ยืนยันได้เฉพาะรายการที่รอชำระเงิน (รายการนี้อาจหมดเวลาหรือถูกยกเลิกแล้ว)')
-  }
-  return getBooking(id)
+// ปิดการยืนยันแบบเดิม: ต้องตรวจและอนุมัติหลักฐานผ่าน reviewPaymentProof เท่านั้น
+export async function confirmBooking(_id: string): Promise<never> {
+  throw new AppError(
+    403,
+    'PAYMENT_REVIEW_REQUIRED',
+    'กรุณาตรวจสอบและอนุมัติสลิปผ่านระบบตรวจสอบการชำระเงินเท่านั้น',
+  )
 }
 
 export async function cancelBooking(id: string) {
@@ -313,7 +309,47 @@ export async function createSlot(input: { time: string; capacity: number; active
 
 export async function updateSlot(id: number, patch: { capacity?: number; active?: boolean }) {
   try {
-    return await prisma.timeSlot.update({ where: { id }, data: patch })
+    return await prisma.$transaction(async (tx) => {
+      // ใช้ Row Lock เดียวกับ createBooking/updateBooking
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "TimeSlot"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `
+
+      const slot = await tx.timeSlot.findUnique({ where: { id } })
+      if (!slot) throw notFound('รอบเวลา')
+
+      if (patch.capacity !== undefined) {
+        const now = new Date()
+        const today = shopNow(now.getTime()).date
+        const usageByDate = await tx.booking.groupBy({
+          by: ['date'],
+          where: {
+            time: slot.time,
+            date: { gte: today },
+            ...activeWhere(now),
+          },
+          _count: { _all: true },
+        })
+
+        const maxUsed = usageByDate.reduce(
+          (max, row) => Math.max(max, row._count._all),
+          0,
+        )
+
+        if (patch.capacity < maxUsed) {
+          throw new AppError(
+            409,
+            'CAPACITY_BELOW_BOOKINGS',
+            `ลด Capacity ไม่ได้ เพราะมีวันที่มีการจองรอบ ${slot.time} อยู่ ${maxUsed} คิว`,
+          )
+        }
+      }
+
+      return tx.timeSlot.update({ where: { id }, data: patch })
+    })
   } catch (e) {
     if (isCode(e, 'P2025')) throw notFound('รอบเวลา')
     throw e

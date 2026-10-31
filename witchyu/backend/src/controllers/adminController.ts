@@ -70,3 +70,29 @@ export const deleteHoliday = asyncHandler(async (req, res) => { await admin.dele
 
 export const getSettings = asyncHandler(async (_req, res) => { res.json({ settings: await admin.getSettings() }) })
 export const updateSettings = asyncHandler(async (req, res) => { res.json({ settings: await admin.updateSettings(parseSettingsPatch(req.body)) }) })
+
+
+
+export const getPaymentProof = asyncHandler(async (req, res) => {
+  const m = await import('../services/paymentProofService.js')
+  const proof = await m.getAdminPaymentProof(String(req.params.id))
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.setHeader('Content-Type', proof.mimeType)
+  res.setHeader('Content-Disposition', 'inline')
+  res.send(proof.data)
+})
+
+export const reviewPaymentProof = asyncHandler(async (req, res) => {
+  const d = req.body?.decision
+  if (d !== 'approved' && d !== 'rejected') {
+    res.status(400).json({ error: { code: 'INVALID_DECISION', message: 'กรุณาเลือกอนุมัติหรือปฏิเสธ' } })
+    return
+  }
+  const m = await import('../services/paymentProofService.js')
+  res.json(await m.reviewPaymentProof(String(req.params.id), req.adminId as string, d, req.body?.note))
+})
+
+export const deletePaymentProof = asyncHandler(async (req, res) => {
+  const m = await import('../services/paymentProofService.js')
+  res.json(await m.deleteAdminPaymentProof(String(req.params.id)))
+})
