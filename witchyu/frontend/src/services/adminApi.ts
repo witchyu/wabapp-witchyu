@@ -50,6 +50,12 @@ export const adminApi = {
     if (q.search) p.set('search', q.search)
     return guard(() => api.get<AdminBookingList>(`${A}/bookings?${p.toString()}`, auth()))
   },
+  reviewPaymentProof: (id: string, decision: 'approved' | 'rejected', note = '') =>
+    guard(() => api.post<{ ok: true }>(
+      `${A}/bookings/${encodeURIComponent(id)}/payment-review`,
+      { decision, note },
+      auth(),
+    )),
   confirmBooking: (id: string) => guard(() => api.post<{ booking: Booking }>(`${A}/bookings/${encodeURIComponent(id)}/confirm`, {}, auth())),
   cancelBooking: (id: string) => guard(() => api.post<{ booking: Booking }>(`${A}/bookings/${encodeURIComponent(id)}/cancel`, {}, auth())),
   deleteBooking: (id: string) => guard(() => api.del<{ ok: true }>(`${A}/bookings/${encodeURIComponent(id)}`, auth())),

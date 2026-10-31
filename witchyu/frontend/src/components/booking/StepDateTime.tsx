@@ -11,11 +11,28 @@ import type { DaySlots } from '../../types'
 
 const LABEL = { available: 'ว่าง', full: 'เต็ม', closed: 'ปิด' } as const
 
+function timeRange(start: string, durationMin: number): string {
+  const [hours, minutes] = start.split(':').map(Number)
+  const total = hours * 60 + minutes + durationMin
+  const endHours = Math.floor((total % (24 * 60)) / 60)
+  const endMinutes = total % 60
+
+  return `${start}–${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`
+}
+
 type State = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DaySlots }
 
 export default function StepDateTime() {
   const { draft, patchDraft } = useBooking()
-  const unlimited = selectedServices(draft.serviceIds).some((x) => x.unlimited)
+  const services = selectedServices(draft.serviceIds)
+  const unlimited = services.some((x) => x.unlimited)
+
+  // ให้ช่วงเวลาที่แสดงสอดคล้องกับกฎระยะเวลาของ Booking
+  // Backend ใช้ขั้นต่ำ 60 นาทีสำหรับบริการทั่วไป
+  const slotDuration = unlimited
+    ? 120
+    : Math.max(60, ...services.map((x) => x.durationMin ?? 0))
+
   const days = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(), i))), [])
   const today = days[0]
   const [state, setState] = useState<State>({ status: 'loading' })
@@ -71,7 +88,7 @@ export default function StepDateTime() {
                 onClick={() => patchDraft({ time: t })}
                 className={`flex h-14 items-center justify-between rounded-2xl border px-4 ${selected ? 'border-gold bg-gold text-night' : 'border-line bg-surface'} disabled:opacity-40`}
               >
-                <span className="text-base font-semibold">{t}</span>
+                <span className="text-base font-semibold">{timeRange(t, slotDuration)}</span>
                 <span className={`text-sm ${selected ? 'font-semibold' : st === 'available' ? 'text-ok' : 'text-mute'}`}>{selected ? 'เลือกแล้ว' : LABEL[st]}</span>
               </button>
             )

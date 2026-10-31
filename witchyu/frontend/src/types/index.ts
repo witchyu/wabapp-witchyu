@@ -3,6 +3,16 @@ export type ServiceGroup = 'question' | 'call' | 'topic' | 'choice' | 'love59' |
 export interface Service {
   id: string
   group: ServiceGroup
+  categoryId?: string | null
+  category?: {
+    id: string
+    label: string
+    hint: string
+    note: string
+    multi: boolean
+    active: boolean
+    sortOrder: number
+  } | null
   name: string
   desc: string
   price: number            // บาท (ต่อคำถาม ถ้า perQuestion = true)

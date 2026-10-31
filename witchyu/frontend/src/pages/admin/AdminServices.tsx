@@ -236,10 +236,17 @@ export default function AdminServices() {
                   const categoryId = e.target.value
                   const selected = categories.find((x) => x.id === categoryId)
 
+                  const legacyGroups: ServiceGroup[] = [
+                    'question', 'call', 'topic', 'choice',
+                    'love59', 'love49', 'work', 'study',
+                  ]
+
                   set({
                     categoryId,
-                    // รักษา legacy group ให้ตรงกับ category เดิมเมื่อเป็นหมวดเก่า
-                    group: (selected?.id ?? form.group) as ServiceGroup,
+                    // หมวดเดิมใช้ group เดิม ส่วนหมวดใหม่คง group เดิมไว้
+                    group: selected && legacyGroups.includes(selected.id as ServiceGroup)
+                      ? selected.id as ServiceGroup
+                      : form.group,
                   })
                 }}
               >

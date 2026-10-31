@@ -15,6 +15,44 @@ export const GROUPS: { id: ServiceGroup; label: string; hint?: string; note?: st
 
 export const isMultiGroup = (g?: ServiceGroup) => GROUPS.find((x) => x.id === g)?.multi ?? false
 
+export interface ServiceGroupOption {
+  id: string
+  label: string
+  hint?: string
+  note?: string
+  multi: boolean
+}
+
+export const serviceCategoryId = (service: Service) =>
+  service.categoryId ?? service.category?.id ?? service.group
+
+export const serviceAllowsMulti = (service?: Service) =>
+  service ? (service.category ? service.category.active && service.category.multi : isMultiGroup(service.group)) : false
+
+export function serviceCategoryOptions(services: Service[]): ServiceGroupOption[] {
+  const groups = new Map<string, ServiceGroupOption>()
+
+  for (const service of services) {
+    if (!service.active || service.category?.active === false) continue
+
+    const id = serviceCategoryId(service)
+    if (groups.has(id)) continue
+
+    const legacy = GROUPS.find((item) => item.id === service.group)
+    const category = service.category
+
+    groups.set(id, {
+      id,
+      label: category?.label ?? legacy?.label ?? id,
+      hint: category?.hint || legacy?.hint,
+      note: category?.note || legacy?.note,
+      multi: category?.multi ?? legacy?.multi ?? false,
+    })
+  }
+
+  return [...groups.values()]
+}
+
 // ข้อมูลบริการมาจาก API (Database) — เก็บไว้ที่นี่เพื่อให้ฟังก์ชันตรวจสอบเรียกใช้ได้แบบ synchronous
 // ServicesProvider จะโหลดและเรียก setServices ก่อนแสดงหน้าใด ๆ
 let registry: Service[] = []

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import BottomSheet from '../BottomSheet'
 import { useBooking } from '../../hooks/useBooking'
-import { GROUPS, servicePrice } from '../../data/services'
+import { serviceCategoryId, serviceCategoryOptions, servicePrice } from '../../data/services'
 import { useServices } from '../../hooks/useServices'
 import { SHOP } from '../../data/shop'
 import type { Service } from '../../types'
@@ -12,6 +12,7 @@ const MULTI_BLOCKED_TEXT = 'ไม่สามารถเลือกหลา�
 export default function StepService() {
   const { draft, patchDraft } = useBooking()
   const { services: SERVICES } = useServices()
+  const groups = serviceCategoryOptions(SERVICES)
   const [openIds, setOpenIds] = useState<string[]>([])
   const { serviceIds, multi, questionCount } = draft
 
@@ -19,6 +20,27 @@ export default function StepService() {
   const [otherOpen, setOtherOpen] = useState(false)
   const [otherText, setOtherText] = useState('')
   const [otherErr, setOtherErr] = useState('')
+  const otherInputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!otherOpen) return
+
+    const timer = window.setTimeout(() => {
+      const input = otherInputRef.current
+      if (!input) return
+
+      input.focus({ preventScroll: true })
+
+      window.setTimeout(() => {
+        input.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        })
+      }, 150)
+    }, 100)
+
+    return () => window.clearTimeout(timer)
+  }, [otherOpen])
 
   const applyToggle = (svc: Service) => {
     const on = serviceIds.includes(svc.id)
@@ -54,10 +76,14 @@ export default function StepService() {
 
   return (
     <div className="grid gap-7">
-      {multi && <p className="rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">โหมดเลือกหลายรายการ — เลือกได้เฉพาะ คำถาม 2 ทางเลือก เซ็ตความรัก การงาน และการเรียน</p>}
+      {multi && <p className="rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">โหมดเลือกหลายรายการ — เลือกได้เฉพาะหมวดที่ Admin อนุญาตให้เลือกหลายบริการ</p>}
 
-      {GROUPS.map((g) => {
-        const list = SERVICES.filter((s) => s.active && s.group === g.id)
+      {groups.map((g) => {
+        const list = SERVICES.filter((s) =>
+          s.active &&
+          s.category?.active !== false &&
+          serviceCategoryId(s) === g.id
+        )
         if (list.length === 0) return null
         const blocked = multi && !g.multi
         return (
@@ -74,24 +100,75 @@ export default function StepService() {
                 const disabled = blocked || callOff
 
                 if (svc.perQuestion) {
-                  const total = servicePrice(svc, questionCount)
+                  const count = Math.max(1, questionCount)
+                  const total = servicePrice(svc, count)
+
                   return (
-                    <div key={svc.id} className={box(sel)}>
-                      <div className="flex items-center gap-3 px-4 pt-3">
-                        <span className="flex-1 text-sm">{svc.name}:</span>
-                        <input
-                          aria-label="จำนวนคำถาม"
-                          inputMode="numeric"
-                          disabled={disabled}
-                          value={questionCount > 0 ? String(questionCount) : ''}
-                          onChange={(e) => patchDraft({ questionCount: Math.min(50, Number(e.target.value.replace(/\D/g, '').slice(0, 2)) || 0) })}
-                          className="h-12 w-24 rounded-xl border border-line bg-night px-3 text-center text-lg text-ink focus:border-gold focus:outline-none"
-                        />
-                      </div>
-                      <p className="px-4 pt-2 text-sm text-mute">ราคารวม ({total} บาท):</p>
-                      <div className="p-3">
-                        <button disabled={disabled || questionCount < 1} onClick={() => select(svc)} className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold disabled:cursor-not-allowed ${sel ? 'bg-gold text-night' : 'bg-raised'}`}>
-                          {sel ? <><Check size={18} />เลือกแล้ว</> : 'เลือกแบบระบุจำนวน'}
+                    <div
+                      key={svc.id}
+                      className={`${box(sel)} flex min-h-[64px] w-full items-center gap-3 px-4 py-3`}
+                    >
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => {
+                          if (questionCount < 1) {
+                            patchDraft({ questionCount: 1 })
+                          }
+                          select(svc)
+                        }}
+                        aria-pressed={sel}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+                      >
+                        <span
+                          className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
+                            sel
+                              ? 'border-gold bg-gold text-night'
+                              : 'border-mute/50'
+                          }`}
+                        >
+                          {sel && <Check size={15} strokeWidth={3} />}
+                        </span>
+
+                        <span className="min-w-0 font-medium">
+                          ระบุเอง
+                          <span className="ml-1 text-sm font-normal text-gold">
+                            ({total} บาท)
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label="ลดจำนวนคำถาม"
+                          disabled={disabled || count <= 1}
+                          onClick={() =>
+                            patchDraft({
+                              questionCount: Math.max(1, count - 1),
+                            })
+                          }
+                          className="grid h-9 w-9 place-items-center rounded-full bg-raised text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          −
+                        </button>
+
+                        <span className="w-7 text-center text-base font-semibold tabular-nums">
+                          {count}
+                        </span>
+
+                        <button
+                          type="button"
+                          aria-label="เพิ่มจำนวนคำถาม"
+                          disabled={disabled || count >= 50}
+                          onClick={() =>
+                            patchDraft({
+                              questionCount: Math.min(50, count + 1),
+                            })
+                          }
+                          className="grid h-9 w-9 place-items-center rounded-full bg-raised text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          +
                         </button>
                       </div>
                     </div>
@@ -132,6 +209,7 @@ export default function StepService() {
       <BottomSheet open={otherOpen} title="พิมพ์คำถามของคุณ" onClose={() => setOtherOpen(false)}>
         <label className="grid gap-2 text-sm">คำถามที่อยากถามหมอดู (อื่นๆ — 49 บาท)
           <textarea
+            ref={otherInputRef}
             autoFocus
             rows={5}
             value={otherText}

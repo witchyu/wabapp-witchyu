@@ -52,6 +52,7 @@ export default function AdminServiceCategories() {
     useLoad(() => adminApi.serviceCategories())
 
   const [form, setForm] = useState<Form | null>(null)
+  const [editingCategory, setEditingCategory] = useState(false)
   const [saving, setSaving] = useState(false)
   const [del, setDel] = useState<AdminServiceCategory | null>(null)
 
@@ -130,12 +131,12 @@ export default function AdminServiceCategories() {
     setSaving(true)
 
     try {
-      if (data.some((x) => x.id === id && x.id !== form.id)) {
+      if (!editingCategory && data.some((x) => x.id === id)) {
         toast('รหัสหมวดหมู่นี้มีอยู่แล้ว', 'error')
         return
       }
 
-      if (form.id) {
+      if (editingCategory) {
         const updated = await adminApi.updateServiceCategory(form.id, {
           label,
           hint,
@@ -202,7 +203,10 @@ export default function AdminServiceCategories() {
         </div>
 
         <button
-          onClick={() => setForm(blank())}
+          onClick={() => {
+            setEditingCategory(false)
+            setForm(blank())
+          }}
           className="flex h-11 shrink-0 items-center gap-2 rounded-xl bg-gold px-4 text-sm font-semibold text-night"
         >
           <Plus size={18} />
@@ -260,7 +264,10 @@ export default function AdminServiceCategories() {
 
                 <button
                   aria-label={`แก้ไขหมวด ${category.label}`}
-                  onClick={() => setForm(fromCategory(category))}
+                  onClick={() => {
+                    setEditingCategory(true)
+                    setForm(fromCategory(category))
+                  }}
                   className="grid h-11 w-11 place-items-center rounded-xl bg-raised"
                 >
                   <Pencil size={18} />
@@ -287,7 +294,7 @@ export default function AdminServiceCategories() {
 
       <BottomSheet
         open={!!form}
-        title={form?.id ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่'}
+        title={editingCategory ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่'}
         onClose={() => !saving && setForm(null)}
       >
         {form && (
@@ -297,7 +304,7 @@ export default function AdminServiceCategories() {
               <input
                 className={input}
                 value={form.id}
-                disabled={!!form.id}
+                disabled={editingCategory}
                 onChange={(e) =>
                   set({ id: e.target.value.replace(/\s/g, '').slice(0, 50) })
                 }

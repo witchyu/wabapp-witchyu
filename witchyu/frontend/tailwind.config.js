@@ -4,19 +4,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        night: '#0D0A14',
-        surface: '#181222',
-        raised: '#221A31',
-        line: '#2E2540',
-        gold: { DEFAULT: '#A855F7', soft: '#D8B4FE', deep: '#7E22CE' },
-        ink: '#F4EFE7',
-        mute: '#9C92AB',
-        ok: '#5FBF8F',
-        warn: '#E8B04A',
-        bad: '#E5736F',
+        night: 'rgb(var(--color-night) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        raised: 'rgb(var(--color-raised) / <alpha-value>)',
+        line: 'rgb(var(--color-line) / <alpha-value>)',
+        gold: {
+          DEFAULT: 'rgb(var(--color-gold) / <alpha-value>)',
+          soft: 'rgb(var(--color-gold-soft) / <alpha-value>)',
+          deep: 'rgb(var(--color-gold-deep) / <alpha-value>)',
+        },
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        mute: 'rgb(var(--color-mute) / <alpha-value>)',
+        ok: 'rgb(var(--color-ok) / <alpha-value>)',
+        warn: 'rgb(var(--color-warn) / <alpha-value>)',
+        bad: 'rgb(var(--color-bad) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['"Noto Sans Thai"', 'system-ui', 'sans-serif'],
+        sans: ['"Mitr"', 'system-ui', 'sans-serif'],
         display: ['"Noto Serif Thai"', 'Georgia', 'serif'],
       },
       keyframes: {

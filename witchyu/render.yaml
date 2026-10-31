@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: witchyu-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN_SECRET
+        sync: false
+      - key: CUSTOMER_TOKEN_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ALLOW_MOCK_PAYMENT
+        value: "false"
+  - type: web
+    name: witchyu-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

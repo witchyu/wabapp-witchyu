@@ -10,6 +10,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { EmptyState, ErrorState, Spinner } from '../../components/states'
 import { useToast } from '../../hooks/useToast'
 import type { Booking } from '../../types'
+import AdminPaymentReview from './AdminPaymentReview'
 import type { AdminBookingFilter } from '../../types/admin'
 import { baht, dateLong, dateShort } from '../../utils/format'
 
@@ -25,16 +26,15 @@ const FILTERS: { id: AdminBookingFilter; label: string }[] = [
 const svcName = (b: Booking) => `${b.serviceName}${b.questionCount ? ` (${b.questionCount} คำถาม)` : ''}`
 const btn = 'h-10 rounded-lg px-3 text-xs font-medium'
 
-interface ActionProps { b: Booking; onDetail: () => void; onConfirm: () => void; onCancel: () => void; onChat: () => void; onCall: () => void; onDelete: () => void }
-function Actions({ b, onDetail, onConfirm, onCancel, onChat, onCall, onDelete }: ActionProps) {
+interface ActionProps { b: Booking; onDetail: () => void; onCancel: () => void; onChat: () => void; onDelete: () => void }
+function Actions({ b, onDetail, onCancel, onChat, onDelete }: ActionProps) {
   return (
     <div className="flex flex-wrap gap-1.5">
       <button onClick={onDetail} className={`${btn} bg-raised`}>ดูรายละเอียด</button>
-      {b.status === 'pending_payment' && <button onClick={onConfirm} className={`${btn} bg-ok/20 text-ok`}>ยืนยัน</button>}
+      {b.status === 'pending_payment' && <button onClick={onDetail} className={`${btn} bg-purple-600 text-white`}>ตรวจสลิป</button>}
       {(b.status === 'pending_payment' || b.status === 'confirmed') && <button onClick={onCancel} className={`${btn} bg-bad/15 text-bad`}>ยกเลิก</button>}
       {(b.status === 'completed' || b.status === 'cancelled') && <button onClick={onDelete} className={btn + ' bg-bad/15 text-bad'}>ลบถาวร</button>}
       <button onClick={onChat} className={`${btn} bg-raised`}>แชต</button>
-      {b.isCall && <button onClick={onCall} className={`${btn} bg-raised`}>โทร</button>}
     </div>
   )
 }
@@ -57,8 +57,6 @@ export default function AdminBookings() {
   }, [searchInput])
 
   const { data, status: load, error, reload } = useLoad(() => adminApi.bookings({ status, date, search, page }), [status, date, search, page])
-
-  const placeholder = (what: string, phase: number) => () => toast(`${what}จะเปิดใช้ใน Phase ${phase} (ปุ่มนี้เป็น Placeholder)`, 'info')
 
   const run = async () => {
     if (!ask || busy) return
@@ -92,7 +90,7 @@ export default function AdminBookings() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
   const actions = (b: Booking) => (
-    <Actions b={b} onDetail={() => setDetail(b)} onConfirm={() => setAsk({ kind: 'confirm', b })} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={() => nav(`/admin/chat/${b.id}`)} onCall={placeholder('โทร', 6)} onDelete={() => setAsk({ kind: 'delete', b })} />
+    <Actions b={b} onDetail={() => setDetail(b)} onCancel={() => setAsk({ kind: 'cancel', b })} onChat={() => nav(`/admin/chat/${b.id}`)} onDelete={() => setAsk({ kind: 'delete', b })} />
   )
 
   return (
@@ -165,6 +163,7 @@ export default function AdminBookings() {
 
       <BottomSheet open={!!detail} title="รายละเอียดการจอง" onClose={() => setDetail(null)}>
         {detail && (
+          <>
           <div className="divide-y divide-line rounded-2xl border border-line bg-night/40 text-sm">
             {([
               ['เลขที่การจอง', detail.id],
@@ -181,6 +180,16 @@ export default function AdminBookings() {
             ))}
             <div className="flex items-center justify-between px-4 py-3"><span className="text-mute">สถานะ</span><StatusBadge status={detail.status} /></div>
           </div>
+          {detail.status === 'pending_payment' && (
+            <AdminPaymentReview
+              bookingId={detail.id}
+              onReviewed={() => {
+                setDetail(null)
+                reload()
+              }}
+            />
+          )}
+          </>
         )}
       </BottomSheet>
 

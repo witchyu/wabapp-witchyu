@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { ThemeProvider } from './components/ThemeProvider'
 import AppLayout from './layouts/AppLayout'
 import Home from './pages/Home'
 import Services from './pages/Services'
@@ -10,6 +11,10 @@ import BookingDetail from './pages/BookingDetail'
 import Chat from './pages/Chat'
 import ChatRoom from './pages/ChatRoom'
 import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import { AuthProvider } from './hooks/useAuth'
 import NotFound from './pages/NotFound'
 import AdminApp from './pages/admin/AdminApp'
 import { ToastProvider } from './hooks/useToast'
@@ -17,14 +22,20 @@ import { BookingProvider } from './hooks/useBooking'
 import { ServicesGate, ServicesProvider } from './hooks/useServices'
 import { ChatSocketProvider } from './hooks/useChatSocket'
 import { customerChatApi } from './services/chatApi'
+import { notificationApi } from './services/notificationApi'
 
 // แอปลูกค้า (ต้องโหลดบริการ/สถานะร้านจากเซิร์ฟเวอร์ก่อนแสดงหน้า)
 function CustomerApp() {
   return (
+    <AuthProvider>
     <ServicesProvider>
       <ServicesGate>
         <BookingProvider>
-          <ChatSocketProvider role="customer" fetchUnread={customerChatApi.unread}>
+          <ChatSocketProvider
+            role="customer"
+            fetchUnread={customerChatApi.unread}
+            fetchNotificationUnread={notificationApi.unread}
+          >
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
@@ -37,6 +48,9 @@ function CustomerApp() {
               <Route path="/chat" element={<Chat />} />
               <Route path="/chat/:id" element={<ChatRoom />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
@@ -44,6 +58,7 @@ function CustomerApp() {
         </BookingProvider>
       </ServicesGate>
     </ServicesProvider>
+    </AuthProvider>
   )
 }
 
@@ -53,8 +68,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Admin แยกจากแอปลูกค้า: เส้นทาง /admin และไม่ผูกกับ BookingProvider */}
-          <Route path="/admin/*" element={<AdminApp />} />
-          <Route path="/*" element={<CustomerApp />} />
+          <Route path="/admin/*" element={<ThemeProvider storageKey="witchyu-admin-theme"><AdminApp /></ThemeProvider>} />
+          <Route path="/*" element={<ThemeProvider storageKey="witchyu-customer-theme"><CustomerApp /></ThemeProvider>} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

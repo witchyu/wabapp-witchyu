@@ -16,11 +16,14 @@ export default function ThreadList({ threads, role, hrefOf, titleOf, avatarOf }:
     <ul className="grid gap-2">
       {threads.map((t) => (
         <li key={t.booking.id}>
-          <Link to={hrefOf(t)} className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 active:bg-raised">
+          <Link
+  to={hrefOf(t)}
+  className="group flex min-h-[76px] items-center gap-3 rounded-2xl border border-line bg-surface p-3 transition active:scale-[0.99] active:bg-raised"
+>
             {avatarOf(t)}
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate font-medium">{titleOf(t)}</span>
+                <span className={`truncate font-medium ${t.unread > 0 ? 'text-ink' : ''}`}>{titleOf(t)}</span>
                 <span className="shrink-0 text-xs text-mute">{t.lastMessage ? timeLabel(t.lastMessage.createdAt) : ''}</span>
               </div>
               <div className="truncate text-xs text-mute">{t.booking.serviceName} · {dateShort(t.booking.date)} {t.booking.time} · {t.booking.id}</div>
@@ -28,7 +31,7 @@ export default function ThreadList({ threads, role, hrefOf, titleOf, avatarOf }:
                 {t.lastMessage ? previewOf(t.lastMessage, role) : 'ยังไม่มีข้อความ — แตะเพื่อเริ่มคุย'}
               </div>
             </div>
-            {t.unread > 0 && <span className="grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-gold px-1.5 text-xs font-bold text-night" aria-label={`ยังไม่อ่าน ${t.unread} ข้อความ`}>{t.unread > 99 ? '99+' : t.unread}</span>}
+            {t.unread > 0 && <span className="grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-gold px-1.5 text-xs font-bold text-night shadow-sm" aria-label={`ยังไม่อ่าน ${t.unread} ข้อความ`}>{t.unread > 99 ? '99+' : t.unread}</span>}
           </Link>
         </li>
       ))}

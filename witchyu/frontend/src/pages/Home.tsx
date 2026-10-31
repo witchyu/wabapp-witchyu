@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarPlus, Clock, MessageCircle, Moon, Phone, Sparkles } from 'lucide-react'
+import { CalendarPlus, Clock, Instagram, MessageCircle, Moon, Phone, Sparkles } from 'lucide-react'
 import { SHOP } from '../data/shop'
 import { getServices } from '../data/services'
 import BottomSheet from '../components/BottomSheet'
@@ -36,6 +36,16 @@ export default function Home() {
           <CalendarPlus size={20} />จองคิว
         </button>
       </section>
+
+      <a
+        href="https://www.instagram.com/witchyu_2006?xtok=MTY1dzFwYTZxcHg2Ng%3D%3D&utm_source=qr"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mx-5 mt-4 flex min-h-[60px] items-center justify-center gap-3 rounded-2xl border border-gold/40 bg-gold px-4 py-3 font-semibold text-white active:scale-[.98]"
+      >
+        <Instagram size={22} />
+        ติดต่อ Witchyu ผ่าน Instagram
+      </a>
 
       <section className="mx-5 mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
         <Clock size={20} className="text-gold" />
@@ -85,7 +95,14 @@ export default function Home() {
 
       <BottomSheet open={contact} title="ติดต่อเรา" onClose={() => setContact(false)}>
         <p className="text-sm text-mute">เวลาทำการ: {SHOP.hoursLabel}</p>
-        <p className="mt-3 text-sm text-mute">ช่องทางติดต่ออื่น ๆ (เบอร์โทร / LINE) ยังเป็นตัวอย่างใน Phase 1 และจะใส่ข้อมูลจริงภายหลัง</p>
+        <a
+          href="https://www.instagram.com/witchyu_2006?xtok=MTY1dzFwYTZxcHg2Ng%3D%3D&utm_source=qr"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex h-12 items-center justify-center gap-2 rounded-2xl border border-gold/40 bg-gold font-semibold text-white"
+        >
+          <Instagram size={18} /> Instagram @witchyu_2006
+        </a>
         <button onClick={() => { setContact(false); nav('/chat') }} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gold font-semibold text-night">
           <MessageCircle size={18} />ไปที่แชต
         </button>

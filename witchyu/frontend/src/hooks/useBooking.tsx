@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Booking, CustomerInfo, Draft } from '../types'
-import { getService, isMultiGroup, selectedServices } from '../data/services'
+import { getService, serviceAllowsMulti, selectedServices } from '../data/services'
 import { EMPTY_CUSTOMER } from '../utils/bookingRules'
 import { blankDraft, clearLegacyStorage, clearSavedCustomer as clearStoredCustomer, loadCustomer, loadDraft, loadRememberPref, saveCustomer, saveDraft, saveRememberPref } from '../utils/storage'
 import { ApiError, errorMessage } from '../services/api'
@@ -24,7 +24,6 @@ interface Ctx {
   refreshBookings: () => Promise<void>
   createBooking: () => Promise<CreateResult>
   cancelBooking: (id: string) => Promise<Booking>
-  payBooking: (id: string) => Promise<Booking>
 }
 
 const BookingCtx = createContext<Ctx | null>(null)
@@ -71,11 +70,21 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   // โหลดตอนเปิดแอป และรีเฟรชเมื่อกลับมาที่แท็บ / ทุก 60 วินาทีขณะเปิดหน้าอยู่ (รับสถานะหมดเวลา/เสร็จสิ้นจากเซิร์ฟเวอร์)
   useEffect(() => {
     refreshBookings()
-    const onVisible = () => { if (document.visibilityState === 'visible') refreshBookings() }
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshBookings()
+    }
+    const onAuthChanged = () => {
+      void refreshBookings()
+    }
+
     document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('witchyu:auth-changed', onAuthChanged)
     const t = setInterval(onVisible, 60000)
+
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('witchyu:auth-changed', onAuthChanged)
       clearInterval(t)
     }
   }, [refreshBookings])
@@ -86,7 +95,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   // เปิดโหมด: ตัดรายการที่อยู่ในเซ็ตที่เลือกหลายรายการไม่ได้ออก / ยกเลิก: ล้างการเลือกทั้งหมด
   const setMulti = useCallback((on: boolean) => {
     setDraft((d) => on
-      ? { ...d, multi: true, time: '', serviceIds: d.serviceIds.filter((id) => isMultiGroup(getService(id)?.group)) }
+      ? { ...d, multi: true, time: '', serviceIds: d.serviceIds.filter((id) => serviceAllowsMulti(getService(id))) }
       : { ...d, multi: false, time: '', serviceIds: [] })
   }, [])
 
@@ -132,14 +141,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return b
   }, [])
 
-  const payBooking = useCallback(async (id: string) => {
-    const b = await bookingApi.mockPay(id)
-    setBookings((l) => upsert(l, b))
-    return b
-  }, [])
 
   return (
-    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, hasSavedCustomer, clearSavedCustomer, bookings, bookingsStatus, bookingsError, refreshBookings, createBooking, cancelBooking, payBooking }}>
+    <BookingCtx.Provider value={{ draft, patchDraft, setMulti, resetDraft, profile, setProfile, hasSavedCustomer, clearSavedCustomer, bookings, bookingsStatus, bookingsError, refreshBookings, createBooking, cancelBooking }}>
       {children}
     </BookingCtx.Provider>
   )

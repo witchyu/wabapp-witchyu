@@ -29,5 +29,10 @@ export const bookingApi = {
   create: (p: CreateBookingPayload) => api.post<{ booking: Booking }>('/bookings', p).then((r) => r.booking),
   update: (id: string, p: UpdateBookingPayload) => api.patch<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}`, p).then((r) => r.booking),
   cancel: (id: string) => api.post<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}/cancel`).then((r) => r.booking),
-  mockPay: (id: string) => api.post<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}/mock-pay`).then((r) => r.booking),
+  paymentProofs: (id: string) =>
+    api.get<{ proofs: { id: string; status: string; createdAt: number }[] }>(`/bookings/${encodeURIComponent(id)}/payment-slip`).then((r) => r.proofs),
+  uploadPaymentProof: (id: string, file: File) =>
+    api.upload<{ proof: { id: string; status: string } }>(`/bookings/${encodeURIComponent(id)}/payment-slip`, file).then((r) => r.proof),
+  deletePaymentProof: (id: string) =>
+    api.del<{ success: boolean }>(`/bookings/${encodeURIComponent(id)}/payment-slip`),
 }

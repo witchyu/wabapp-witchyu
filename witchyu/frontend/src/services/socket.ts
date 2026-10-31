@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import { getClientId } from './clientId'
+import { getCustomerToken } from './customerToken'
 import { adminToken } from './adminApi'
 import type { ChatRole } from '../types/chat'
 
@@ -9,7 +10,14 @@ const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replac
 export function createSocket(role: ChatRole): Socket {
   const opts = {
     path: '/socket.io',
-    auth: (cb: (data: Record<string, string>) => void) => cb(role === 'admin' ? { adminToken: adminToken.get() } : { clientId: getClientId() }),
+    auth: (cb: (data: Record<string, string>) => void) => {
+      if (role === 'admin') {
+        cb({ adminToken: adminToken.get() })
+        return
+      }
+      const token = getCustomerToken()
+      cb(token ? { customerToken: token } : { clientId: getClientId() })
+    },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
