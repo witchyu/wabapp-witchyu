@@ -70,5 +70,5 @@ export interface DaySlots {
   date: string
   closed: boolean         // ทั้งวันปิดรับ (วันหยุด/นอกช่วง 7 วัน)
   reason?: string
-  slots: { time: string; status: SlotStatus }[]
+  slots: { time: string; endTime: string; isLastSlot: boolean; unlimited: boolean; status: SlotStatus }[]
 }

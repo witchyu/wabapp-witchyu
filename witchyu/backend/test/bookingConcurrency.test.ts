@@ -7,7 +7,7 @@ import { updateSlot } from '../src/services/adminService'
 import { AppError } from '../src/domain/errors'
 import { addDaysISO, dayOfWeek, shopNow } from '../src/domain/time'
 
-test('booking concurrency: capacity, unique IDs and admin capacity protection', async () => {
+test('booking concurrency: one booking per slot and admin slot protection', async () => {
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const date = addDaysISO(shopNow(Date.now()).date, 1)
   const day = dayOfWeek(date)
@@ -42,8 +42,19 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
     for (const time of times) {
       await prisma.timeSlot.upsert({
         where: { time },
-        update: { capacity: 2, active: true },
-        create: { time, capacity: 2, active: true },
+        update: {
+          endTime: time === '23:00' ? '23:30' : '23:59',
+          isLastSlot: false,
+          unlimited: false,
+          active: true,
+        },
+        create: {
+          time,
+          endTime: time === '23:00' ? '23:30' : '23:59',
+          isLastSlot: false,
+          unlimited: false,
+          active: true,
+        },
       })
     }
 
@@ -75,7 +86,7 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
       note: 'Automated concurrency integration test',
     })
 
-    // Test 1: ลูกค้า 8 คนจอง Slot เดียวกันที่มี Capacity 2 พร้อมกัน
+    // Test 1: ลูกค้า 8 คนจอง Slot เดียวกันพร้อมกัน ต้องสำเร็จเพียง 1 คน
     const results = await Promise.allSettled(
       clientIds.slice(0, 8).map((clientId, index) =>
         createBooking(clientId, makeInput(times[0], index)),
@@ -106,7 +117,7 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
 
     createdBookingIds.push(...successful.map((b) => b.id))
 
-    assert.equal(successful.length, 2, 'ต้องสร้าง Booking ได้เท่ากับ Capacity 2')
+    assert.equal(successful.length, 1, 'หนึ่ง Slot ต้องมี Booking ที่ใช้งานอยู่ได้เพียง 1 รายการ')
 
     const rejected = results.filter((r) => r.status === 'rejected')
 
@@ -127,7 +138,7 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
       })
     }
 
-    assert.equal(rejected.length, 6, 'คำขอที่เหลือต้องถูกปฏิเสธ')
+    assert.equal(rejected.length, 7, 'คำขอที่เหลืออีก 7 รายการต้องถูกปฏิเสธ')
 
     for (const result of rejected) {
       if (result.status !== 'rejected') continue
@@ -145,30 +156,30 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
       select: { id: true },
     })
 
-    assert.equal(firstSlotBookings.length, 2)
-    assert.equal(new Set(firstSlotBookings.map((b) => b.id)).size, 2)
+    assert.equal(firstSlotBookings.length, 1)
+    assert.equal(new Set(firstSlotBookings.map((b) => b.id)).size, 1)
 
-    // Test 2: ต่าง Slot แต่วันเดียวกัน ต้องได้ Booking ID ไม่ซ้ำ
-    const secondResults = await Promise.all([
-      createBooking(clientIds[8], makeInput(times[1], 8)),
-      createBooking(clientIds[9], makeInput(times[1], 9)),
-    ])
+    // Test 2: อีก Slot หนึ่งต้องจองได้ และ Booking ID ต้องไม่ซ้ำ
+    const secondBooking = await createBooking(
+      clientIds[8],
+      makeInput(times[1], 8),
+    )
 
-    createdBookingIds.push(...secondResults.map((b) => b.id))
+    createdBookingIds.push(secondBooking.id)
 
-    const allIds = [...successful.map((b) => b.id), ...secondResults.map((b) => b.id)]
+    const allIds = [...successful.map((b) => b.id), secondBooking.id]
     assert.equal(new Set(allIds).size, allIds.length, 'Booking ID ต้องไม่ซ้ำกัน')
 
-    // Test 3: Admin ห้ามลด Capacity ต่ำกว่าจำนวนคิวที่กำลังใช้งาน
+    // Test 3: Admin ห้ามปิด Slot ที่มี Booking ซึ่งยังใช้งานอยู่
     const slot = await prisma.timeSlot.findUniqueOrThrow({
       where: { time: times[0] },
     })
 
     await assert.rejects(
-      () => updateSlot(slot.id, { capacity: 1 }),
+      () => updateSlot(slot.id, { active: false }),
       (error: unknown) => {
         assert.ok(error instanceof AppError)
-        assert.equal(error.code, 'CAPACITY_BELOW_BOOKINGS')
+        assert.equal(error.code, 'SLOT_IN_USE')
         return true
       },
     )
@@ -177,13 +188,13 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
       where: { id: slot.id },
     })
 
-    assert.equal(unchangedSlot.capacity, 2)
+    assert.equal(unchangedSlot.active, true)
 
     console.log('Concurrency test passed:', {
       successfulBookings: successful.length,
       rejectedBookings: rejected.length,
       uniqueBookingIds: allIds.length,
-      adminCapacityProtection: true,
+      adminSlotProtection: true,
     })
   } finally {
     // ลบข้อมูลทดสอบที่สร้างจาก Client IDs นี้เท่านั้น
@@ -220,7 +231,13 @@ test('booking concurrency: capacity, unique IDs and admin capacity protection', 
       if (old) {
         await prisma.timeSlot.update({
           where: { id: old.id },
-          data: { time: old.time, capacity: old.capacity, active: old.active },
+          data: {
+            time: old.time,
+            endTime: old.endTime,
+            isLastSlot: old.isLastSlot,
+            unlimited: old.unlimited,
+            active: old.active,
+          },
         })
       } else {
         await prisma.timeSlot.deleteMany({ where: { time } })

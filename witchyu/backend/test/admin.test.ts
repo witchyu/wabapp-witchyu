@@ -90,7 +90,7 @@ test('shop switch closes every slot (SHOP_CLOSED)', () => {
   const day = computeDaySlots({
     date: '2026-10-05', shopOpen: false, now, unlimited: false, holiday: null, counts: {},
     hours: { openTime: '18:00', closeTime: '23:00', isClosed: false },
-    slots: [{ time: '19:00', capacity: 1, active: true }],
+    slots: [{ time: '19:00', endTime: '20:00', isLastSlot: false, unlimited: false, active: true }],
   })
   assert.equal(day.closed, true); assert.equal(day.reasonCode, 'SHOP_CLOSED')
   assert.equal(code(() => assertSlotAvailable(day, '19:00')), 'SHOP_CLOSED')
@@ -122,12 +122,40 @@ test('parseServiceCreate / parseServicePatch', () => {
 })
 
 test('slots / hours / holiday / settings / bookings query validation', () => {
-  assert.deepEqual(parseSlotCreate({ time: '20:30' }), { time: '20:30', capacity: 1, active: true })
-  assert.equal(code(() => parseSlotCreate({ time: '25:00' })), 'VALIDATION')
-  assert.equal(code(() => parseSlotCreate({ time: '20:00', capacity: 0 })), 'VALIDATION')
-  assert.equal(code(() => parseSlotCreate({ time: '20:00', capacity: 21 })), 'VALIDATION')
-  assert.deepEqual(parseSlotPatch({ capacity: 3 }), { capacity: 3 })
-  assert.equal(code(() => parseSlotPatch({ time: '10:00' })), 'VALIDATION')
+  assert.deepEqual(
+    parseSlotCreate({ time: '20:30', endTime: '21:00' }),
+    {
+      time: '20:30',
+      endTime: '21:00',
+      isLastSlot: false,
+      unlimited: false,
+      active: true,
+    },
+  )
+  assert.deepEqual(
+    parseSlotCreate({
+      time: '22:00',
+      endTime: '23:00',
+      isLastSlot: true,
+      unlimited: true,
+      active: false,
+    }),
+    {
+      time: '22:00',
+      endTime: '23:00',
+      isLastSlot: true,
+      unlimited: true,
+      active: false,
+    },
+  )
+  assert.equal(code(() => parseSlotCreate({ time: '25:00', endTime: '26:00' })), 'VALIDATION')
+  assert.equal(code(() => parseSlotCreate({ time: '20:00', endTime: '20:00' })), 'VALIDATION')
+  assert.equal(code(() => parseSlotCreate({ time: '20:00' })), 'VALIDATION')
+  assert.deepEqual(parseSlotPatch({ unlimited: true }), { unlimited: true })
+  assert.deepEqual(parseSlotPatch({ isLastSlot: true, active: false }), { isLastSlot: true, active: false })
+  assert.equal(code(() => parseSlotPatch({ unlimited: 'yes' })), 'VALIDATION')
+  assert.equal(code(() => parseSlotPatch({ time: '25:00' })), 'VALIDATION')
+  assert.equal(code(() => parseSlotPatch({ time: '10:00', endTime: '10:00' })), 'VALIDATION')
 
   const hours = Array.from({ length: 7 }, (_, d) => ({ dayOfWeek: d, openTime: '18:00', closeTime: '23:00', isClosed: false }))
   assert.equal(parseHoursAll({ hours }).length, 7)

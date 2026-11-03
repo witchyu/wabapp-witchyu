@@ -183,18 +183,28 @@ export async function updateBooking(clientId: string, id: string, patch: UpdateB
       data.age = patch.customer.age
       data.relationship = patch.customer.relationship
     }
-    if (patch.date && patch.time && (patch.date !== cur.date || patch.time !== cur.time)) {
-      const services = await tx.service.findMany({ where: { id: { in: cur.serviceIds } } })
-      await lockTimeSlot(tx, patch.time)
-      const day = await loadDaySlots(tx, patch.date, {
+    const targetDate = patch.date ?? cur.date
+    const targetTime = patch.time ?? cur.time
+    const bookingTimeChanged =
+      targetDate !== cur.date || targetTime !== cur.time
+
+    if (bookingTimeChanged) {
+      const services = await tx.service.findMany({
+        where: { id: { in: cur.serviceIds } },
+      })
+
+      await lockTimeSlot(tx, targetTime)
+
+      const day = await loadDaySlots(tx, targetDate, {
         unlimited: services.some((s) => s.unlimited),
         nowMs,
-        excludeBookingId: cur.id, // ไม่นับคิวของตัวเอง
+        excludeBookingId: cur.id,
       })
-      assertSlotAvailable(day, patch.time)
-      data.date = patch.date
-      data.time = patch.time
-      // ย้ายวันแล้ว เลขที่การจองยังคงเดิม (ใช้เป็นรหัสอ้างอิงตอนจอง)
+
+      assertSlotAvailable(day, targetTime)
+
+      data.date = targetDate
+      data.time = targetTime
     }
     return tx.booking.update({ where: { id: cur.id }, data })
   })
@@ -269,14 +279,17 @@ async function runSettlement(): Promise<void> {
     select: { id: true, durationMin: true, unlimited: true },
   })
 
+  const slotRows = await prisma.timeSlot.findMany({
+    select: { time: true, endTime: true },
+  })
   const finished = due
-    .filter((b) =>
-      bookingEndMs(
-        b.date,
-        b.time,
-        services.filter((s) => b.serviceIds.includes(s.id)),
-      ) <= now.getTime(),
-    )
+    .filter((b) => {
+      const slot = slotRows.find((s) => s.time === b.time)
+      if (slot) return bookingEndMs(b.date, b.time, slot.endTime) <= now.getTime()
+      const fallback = services.filter((s) => b.serviceIds.includes(s.id))
+      const minutes = Math.max(60, ...fallback.map((s) => s.durationMin ?? 0))
+      return Date.parse(`${b.date}T${b.time}:00+07:00`) + minutes * 60000 <= now.getTime()
+    })
     .map((b) => b.id)
 
   if (finished.length > 0) {

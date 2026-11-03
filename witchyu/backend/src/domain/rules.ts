@@ -3,7 +3,6 @@ import { addDaysISO, startMs, toMinutes, type ShopNow } from './time'
 
 export const BOOKING_DAYS = 7
 export const MAX_QUESTIONS = 50
-export const UNLIMITED_SLOT = '22:30'
 export const OTHER_SERVICE_ID = 'ch-other'
 export const PAYMENT_LIMIT_MS = 15 * 60 * 1000
 // เซ็ตที่เลือกหลายรายการพร้อมกันได้ (คำถาม 2 ทางเลือก / ความรัก / การงาน / การเรียน)
@@ -70,7 +69,13 @@ export function resolveSelection(
 }
 
 // ---------- รอบเวลา ----------
-export interface SlotRow { time: string; capacity: number; active: boolean }
+export interface SlotRow {
+  time: string
+  endTime: string
+  isLastSlot: boolean
+  unlimited: boolean
+  active: boolean
+}
 export interface HoursRow { openTime: string; closeTime: string; isClosed: boolean }
 export type SlotState = 'available' | 'full' | 'closed'
 export interface DaySlots {
@@ -78,25 +83,43 @@ export interface DaySlots {
   closed: boolean
   reasonCode?: 'DATE_OUT_OF_RANGE' | 'DAY_CLOSED' | 'SHOP_CLOSED'
   reason?: string
-  slots: { time: string; status: SlotState }[]
+  slots: { time: string; endTime: string; isLastSlot: boolean; unlimited: boolean; status: SlotState }[]
+}
+
+function intervalMinutes(start: string, end: string): [number, number] {
+  const a = toMinutes(start)
+  let b = toMinutes(end)
+  if (b <= a) b += 1440
+  return [a, b]
 }
 
 export function computeDaySlots(a: {
   date: string
-  shopOpen: boolean // สวิตช์เปิด/ปิดร้านของ Admin
+  shopOpen: boolean
   now: ShopNow
   slots: SlotRow[]
   hours: HoursRow | null
   holiday: { reason: string } | null
-  counts: Record<string, number> // จำนวนคิวที่ถือรอบไว้ ต่อเวลา
+  counts: Record<string, number>
   unlimited: boolean
 }): DaySlots {
-  const ordered = [...a.slots].sort((x, y) => x.time.localeCompare(y.time))
+  const ordered = [...a.slots].sort((x, y) => {
+    const ax = toMinutes(x.time)
+    const ay = toMinutes(y.time)
+    return ax - ay
+  })
+
   const allClosed = (extra: Partial<DaySlots>): DaySlots => ({
     date: a.date,
     closed: true,
     ...extra,
-    slots: ordered.map((s) => ({ time: s.time, status: 'closed' as const })),
+    slots: ordered.map((s) => ({
+      time: s.time,
+      endTime: s.endTime,
+      isLastSlot: s.isLastSlot,
+      unlimited: s.unlimited,
+      status: 'closed' as const,
+    })),
   })
 
   if (!a.shopOpen) return allClosed({ reasonCode: 'SHOP_CLOSED', reason: 'ขณะนี้ร้านปิดรับจองคิว' })
@@ -108,19 +131,37 @@ export function computeDaySlots(a: {
   if (a.holiday) return allClosed({ reasonCode: 'DAY_CLOSED', reason: a.holiday.reason || 'วันหยุดร้าน' })
   if (!a.hours || a.hours.isClosed) return allClosed({ reasonCode: 'DAY_CLOSED', reason: 'ร้านปิดทำการวันนี้' })
 
-  const open = toMinutes(a.hours.openTime)
-  const close = toMinutes(a.hours.closeTime)
+  const [open, close] = intervalMinutes(a.hours.openTime, a.hours.closeTime)
+
   return {
     date: a.date,
     closed: false,
     slots: ordered.map((s) => {
-      const m = toMinutes(s.time)
+      const [rawStart, rawEnd] = intervalMinutes(s.time, s.endTime)
+      let start = rawStart
+      let finish = rawEnd
+
+      // สำหรับเวลาหลังเที่ยงคืนในวันทำการที่เปิดข้ามคืน
+      if (close > 1440 && start < open) {
+        start += 1440
+        finish += 1440
+      }
+
       let status: SlotState
-      if (!s.active || m < open || m >= close) status = 'closed'
-      else if (a.date === a.now.date && m <= a.now.minutes) status = 'closed'
-      else if (a.unlimited && s.time !== UNLIMITED_SLOT) status = 'closed'
-      else status = (a.counts[s.time] ?? 0) >= s.capacity ? 'full' : 'available'
-      return { time: s.time, status }
+
+      if (!s.active || start < open || finish > close || finish <= start) status = 'closed'
+      else if (a.date === a.now.date && start <= a.now.minutes) status = 'closed'
+      else if (a.unlimited && !s.unlimited) status = 'closed'
+      else if ((a.counts[s.time] ?? 0) > 0) status = 'full'
+      else status = 'available'
+
+      return {
+        time: s.time,
+        endTime: s.endTime,
+        isLastSlot: s.isLastSlot,
+        unlimited: s.unlimited,
+        status,
+      }
     }),
   }
 }
@@ -147,11 +188,11 @@ export function nextBookingId(existingIds: string[], date: string): string {
   return `${prefix}${String(max + 1).padStart(3, '0')}`
 }
 
-export function bookingEndMs(date: string, time: string, services: Pick<ServiceRow, 'durationMin' | 'unlimited'>[]): number {
-  const minutes = services.some((s) => s.unlimited)
-    ? 120
-    : Math.max(60, ...services.map((s) => s.durationMin ?? 0))
-  return startMs(date, time) + minutes * 60000
+export function bookingEndMs(date: string, time: string, endTime: string): number {
+  const start = startMs(date, time)
+  let end = startMs(date, endTime)
+  if (end <= start) end += 24 * 60 * 60 * 1000
+  return end
 }
 
 export function isEditable(b: { status: string; expiresAtMs: number; date: string; time: string }, nowMs: number): boolean {

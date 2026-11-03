@@ -159,21 +159,61 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
 }
 
 // ---------- รอบเวลา ----------
-export function parseSlotCreate(body: unknown): { time: string; capacity: number; active: boolean } {
+export function parseSlotCreate(body: unknown): {
+  time: string
+  endTime: string
+  isLastSlot: boolean
+  unlimited: boolean
+  active: boolean
+} {
   const o = obj(body)
-  if (!isHHMM(o.time)) throw bad('รูปแบบเวลาไม่ถูกต้อง (HH:mm)')
+  if (!isHHMM(o.time) || !isHHMM(o.endTime)) {
+    throw bad('รูปแบบเวลาไม่ถูกต้อง (HH:mm)')
+  }
+  if (o.time === o.endTime) {
+    throw bad('เวลาเริ่มและเวลาสิ้นสุดต้องไม่ตรงกัน')
+  }
+
   return {
     time: o.time,
-    capacity: o.capacity == null ? 1 : int(o.capacity, 'จำนวนคิวสูงสุด', 1, 20),
+    endTime: o.endTime,
+    isLastSlot: o.isLastSlot == null ? false : bool(o.isLastSlot, 'isLastSlot'),
+    unlimited: o.unlimited == null ? false : bool(o.unlimited, 'unlimited'),
     active: o.active == null ? true : bool(o.active, 'สถานะ'),
   }
 }
 
-export function parseSlotPatch(body: unknown): { capacity?: number; active?: boolean } {
+export function parseSlotPatch(body: unknown): {
+  time?: string
+  endTime?: string
+  isLastSlot?: boolean
+  unlimited?: boolean
+  active?: boolean
+} {
   const o = obj(body)
-  const out: { capacity?: number; active?: boolean } = {}
-  if (o.capacity !== undefined) out.capacity = int(o.capacity, 'จำนวนคิวสูงสุด', 1, 20)
+  const out: {
+    time?: string
+    endTime?: string
+    isLastSlot?: boolean
+    unlimited?: boolean
+    active?: boolean
+  } = {}
+
+  if (o.time !== undefined) {
+    if (!isHHMM(o.time)) throw bad('รูปแบบเวลาเริ่มไม่ถูกต้อง (HH:mm)')
+    out.time = o.time
+  }
+  if (o.endTime !== undefined) {
+    if (!isHHMM(o.endTime)) throw bad('รูปแบบเวลาสิ้นสุดไม่ถูกต้อง (HH:mm)')
+    out.endTime = o.endTime
+  }
+  if (o.isLastSlot !== undefined) out.isLastSlot = bool(o.isLastSlot, 'isLastSlot')
+  if (o.unlimited !== undefined) out.unlimited = bool(o.unlimited, 'unlimited')
   if (o.active !== undefined) out.active = bool(o.active, 'สถานะ')
+
+  if (out.time && out.endTime && out.time === out.endTime) {
+    throw bad('เวลาเริ่มและเวลาสิ้นสุดต้องไม่ตรงกัน')
+  }
   if (Object.keys(out).length === 0) throw bad('ไม่มีข้อมูลที่ต้องการแก้ไข')
   return out
 }
@@ -192,7 +232,9 @@ export function parseHoursAll(body: unknown): HoursInput[] {
     seen.add(dayOfWeek)
     if (!isHHMM(r.openTime) || !isHHMM(r.closeTime)) throw bad('รูปแบบเวลาไม่ถูกต้อง (HH:mm)')
     const isClosed = bool(r.isClosed, 'สถานะปิดทำการ')
-    if (!isClosed && toMinutes(r.openTime) >= toMinutes(r.closeTime)) throw bad('เวลาเปิดต้องมาก่อนเวลาปิด')
+    if (!isClosed && toMinutes(r.openTime) >= toMinutes(r.closeTime)) {
+      throw bad('เวลาเปิดต้องมาก่อนเวลาปิด')
+    }
     return { dayOfWeek, openTime: r.openTime, closeTime: r.closeTime, isClosed }
   })
 }

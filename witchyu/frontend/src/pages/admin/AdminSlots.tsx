@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Minus, Plus, Trash2 } from 'lucide-react'
+import { Plus, Save, Trash2, X, Clock3, Flag } from 'lucide-react'
 import { adminApi } from '../../services/adminApi'
 import { errorMessage } from '../../services/api'
 import { useLoad } from '../../components/admin/useLoad'
@@ -9,37 +9,75 @@ import { ErrorState, Spinner } from '../../components/states'
 import { useToast } from '../../hooks/useToast'
 import type { AdminSlot } from '../../types/admin'
 
+type SlotForm = {
+  time: string
+  endTime: string
+  isLastSlot: boolean
+  unlimited: boolean
+}
+const emptyForm: SlotForm = {
+  time: '',
+  endTime: '',
+  isLastSlot: false,
+  unlimited: false,
+}
+
+const validTime = (value: string) =>
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+
+const sortSlots = (slots: AdminSlot[]) =>
+  [...slots].sort((a, b) => a.time.localeCompare(b.time))
+
 export default function AdminSlots() {
   const toast = useToast()
   const { data, setData, status, error, reload } = useLoad(() => adminApi.slots())
-  const [time, setTime] = useState('')
-  const [capacity, setCapacity] = useState(1)
+
+  const [form, setForm] = useState<SlotForm>(emptyForm)
   const [adding, setAdding] = useState(false)
+  const [savingId, setSavingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<SlotForm>(emptyForm)
   const [del, setDel] = useState<AdminSlot | null>(null)
 
   if (status === 'loading') return <Spinner />
-  if (status === 'error' || !data) return <ErrorState title="โหลดรอบเวลาไม่สำเร็จ" text={error} onRetry={reload} />
+  if (status === 'error' || !data) {
+    return <ErrorState title="โหลดรอบเวลาไม่สำเร็จ" text={error} onRetry={reload} />
+  }
 
-  const replace = (s: AdminSlot) => setData(data.map((x) => (x.id === s.id ? s : x)))
+  const updateForm = (key: keyof SlotForm, value: string | boolean) => {
+    setForm((current) => ({ ...current, [key]: value }))
+  }
 
-  const patch = async (s: AdminSlot, p: { capacity?: number; active?: boolean }) => {
-    replace({ ...s, ...p })
-    try {
-      replace(await adminApi.updateSlot(s.id, p))
-    } catch (e) {
-      replace(s)
-      toast(errorMessage(e), 'error')
+  const updateEditForm = (key: keyof SlotForm, value: string | boolean) => {
+    setEditForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const validateRange = (start: string, end: string) => {
+    if (!validTime(start) || !validTime(end)) {
+      toast('กรุณากำหนดเวลาเริ่มต้นและสิ้นสุดให้ถูกต้อง', 'error')
+      return false
     }
+    if (start === end) {
+      toast('เวลาเริ่มต้นและสิ้นสุดต้องไม่ตรงกัน', 'error')
+      return false
+    }
+    return true
   }
 
   const add = async () => {
     if (adding) return
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return toast('กรุณาเลือกเวลา', 'error')
+    if (!validateRange(form.time, form.endTime)) return
+
     setAdding(true)
     try {
-      const s = await adminApi.createSlot({ time, capacity })
-      setData([...data, s].sort((a, b) => a.time.localeCompare(b.time)))
-      setTime('')
+      const slot = await adminApi.createSlot(form)
+      setData(sortSlots([
+        ...data.map((item) =>
+          slot.isLastSlot ? { ...item, isLastSlot: false } : item
+        ),
+        slot,
+      ]))
+      setForm(emptyForm)
       toast('เพิ่มรอบเวลาแล้ว', 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
@@ -48,11 +86,86 @@ export default function AdminSlots() {
     }
   }
 
+  const startEdit = (slot: AdminSlot) => {
+    setEditingId(slot.id)
+    setEditForm({
+      time: slot.time,
+      endTime: slot.endTime,
+      isLastSlot: slot.isLastSlot,
+      unlimited: slot.unlimited,
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditForm(emptyForm)
+  }
+
+  const saveEdit = async (slot: AdminSlot) => {
+    if (savingId !== null) return
+    if (!validateRange(editForm.time, editForm.endTime)) return
+
+    setSavingId(slot.id)
+    try {
+      const updated = await adminApi.updateSlot(slot.id, editForm)
+      setData(sortSlots(data.map((item) => {
+        if (item.id === updated.id) return updated
+        if (updated.isLastSlot) return { ...item, isLastSlot: false }
+        return item
+      })))
+      cancelEdit()
+      toast('บันทึกรอบเวลาแล้ว', 'success')
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const patch = async (slot: AdminSlot, patchData: { active?: boolean }) => {
+    const previous = data
+    setData(data.map((item) =>
+      item.id === slot.id ? { ...item, ...patchData } : item
+    ))
+
+    try {
+      const updated = await adminApi.updateSlot(slot.id, patchData)
+      setData(data.map((item) =>
+        item.id === updated.id ? updated : item
+      ))
+    } catch (e) {
+      setData(previous)
+      toast(errorMessage(e), 'error')
+    }
+  }
+
+  const setLastSlot = async (slot: AdminSlot) => {
+    const previous = data
+    setData(data.map((item) => ({
+      ...item,
+      isLastSlot: item.id === slot.id,
+    })))
+
+    try {
+      const updated = await adminApi.updateSlot(slot.id, {
+        isLastSlot: true,
+      })
+      setData(data.map((item) => ({
+        ...item,
+        isLastSlot: item.id === updated.id,
+      })))
+      toast('กำหนดรอบสุดท้ายแล้ว', 'success')
+    } catch (e) {
+      setData(previous)
+      toast(errorMessage(e), 'error')
+    }
+  }
+
   const remove = async () => {
     if (!del) return
     try {
       await adminApi.deleteSlot(del.id)
-      setData(data.filter((x) => x.id !== del.id))
+      setData(data.filter((item) => item.id !== del.id))
       toast('ลบรอบเวลาแล้ว', 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
@@ -64,44 +177,220 @@ export default function AdminSlots() {
   return (
     <div className="grid gap-6">
       <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="mb-3 font-display text-base font-semibold">เพิ่มรอบเวลาใหม่</h2>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="grid gap-1.5 text-sm">เวลา
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-12 rounded-xl border border-line bg-night px-3 focus:border-gold focus:outline-none" />
+        <h2 className="mb-3 font-display text-base font-semibold">
+          เพิ่มรอบเวลาใหม่
+        </h2>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+          <label className="grid gap-1.5 text-sm">
+            เวลาเริ่มต้น
+            <input
+              type="time"
+              value={form.time}
+              onChange={(e) => updateForm('time', e.target.value)}
+              className="h-12 rounded-xl border border-line bg-night px-3 focus:border-primary focus:outline-none"
+            />
           </label>
-          <div className="grid gap-1.5 text-sm">จำนวนคิวสูงสุด
-            <div className="flex h-12 items-center gap-2">
-              <button aria-label="ลดจำนวนคิว" onClick={() => setCapacity(Math.max(1, capacity - 1))} className="grid h-11 w-11 place-items-center rounded-full bg-raised"><Minus size={18} /></button>
-              <span className="w-8 text-center text-lg font-semibold">{capacity}</span>
-              <button aria-label="เพิ่มจำนวนคิว" onClick={() => setCapacity(Math.min(20, capacity + 1))} className="grid h-11 w-11 place-items-center rounded-full bg-raised"><Plus size={18} /></button>
-            </div>
-          </div>
-          <button disabled={adding} onClick={add} className="flex h-12 items-center gap-2 rounded-xl bg-gold px-5 font-semibold text-night disabled:opacity-60"><Plus size={18} />เพิ่ม</button>
+
+          <label className="grid gap-1.5 text-sm">
+            เวลาสิ้นสุด
+            <input
+              type="time"
+              value={form.endTime}
+              onChange={(e) => updateForm('endTime', e.target.value)}
+              className="h-12 rounded-xl border border-line bg-night px-3 focus:border-primary focus:outline-none"
+            />
+          </label>
+
+          <button
+            disabled={adding}
+            onClick={add}
+            className="flex h-12 items-center justify-center gap-2 self-end rounded-xl bg-primary px-5 font-semibold text-white disabled:opacity-60"
+          >
+            <Plus size={18} />
+            {adding ? 'กำลังเพิ่ม...' : 'เพิ่มรอบเวลา'}
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.isLastSlot}
+              onChange={(e) => updateForm('isLastSlot', e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            กำหนดเป็นรอบสุดท้ายของวัน
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.unlimited}
+              onChange={(e) => updateForm('unlimited', e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            เปิดให้บริการแพ็กเกจ Unlimited
+          </label>
         </div>
       </section>
 
       <section>
-        <h2 className="mb-1 font-display text-base font-semibold">รอบเวลาทั้งหมด</h2>
-        <p className="mb-3 text-sm text-mute">สวิตช์ = เปิด/ปิดรับจองรอบนั้น · จำนวนคิว = รับได้กี่คนต่อรอบ</p>
-        <ul className="grid gap-2 md:grid-cols-2">
-          {data.map((s) => (
-            <li key={s.id} className={`flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 ${s.active ? '' : 'opacity-60'}`}>
-              <span className="w-16 font-display text-xl font-semibold">{s.time}</span>
-              <div className="flex flex-1 items-center gap-2">
-                <button aria-label={`ลดจำนวนคิว ${s.time}`} disabled={s.capacity <= 1} onClick={() => patch(s, { capacity: s.capacity - 1 })} className="grid h-11 w-11 place-items-center rounded-full bg-raised disabled:opacity-40"><Minus size={18} /></button>
-                <span className="min-w-[2.5rem] text-center"><span className="text-lg font-semibold">{s.capacity}</span><span className="block text-[11px] text-mute">คิว</span></span>
-                <button aria-label={`เพิ่มจำนวนคิว ${s.time}`} disabled={s.capacity >= 20} onClick={() => patch(s, { capacity: s.capacity + 1 })} className="grid h-11 w-11 place-items-center rounded-full bg-raised disabled:opacity-40"><Plus size={18} /></button>
-              </div>
-              <Toggle label={`เปิดรับจองรอบ ${s.time}`} checked={s.active} onChange={(v) => patch(s, { active: v })} />
-              <button aria-label={`ลดรอบ ${s.time}`} onClick={() => setDel(s)} className="grid h-11 w-11 place-items-center rounded-xl bg-bad/15 text-bad"><Trash2 size={18} /></button>
+        <h2 className="mb-1 font-display text-base font-semibold">
+          รอบเวลาทั้งหมด
+        </h2>
+        <p className="mb-3 text-sm text-mute">
+          แต่ละรอบรับจองได้ 1 คน · ลูกค้าจะเห็นช่วงเวลาตามที่กำหนดไว้
+        </p>
+
+        <ul className="grid gap-3 md:grid-cols-2">
+          {data.map((slot) => (
+            <li
+              key={slot.id}
+              className={`rounded-2xl border border-line bg-surface p-3 ${
+                slot.active ? '' : 'opacity-60'
+              }`}
+            >
+              {editingId === slot.id ? (
+                <div className="grid gap-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="grid gap-1 text-sm">
+                      เวลาเริ่มต้น
+                      <input
+                        type="time"
+                        value={editForm.time}
+                        onChange={(e) => updateEditForm('time', e.target.value)}
+                        className="h-11 min-w-0 rounded-xl border border-line bg-night px-2"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      เวลาสิ้นสุด
+                      <input
+                        type="time"
+                        value={editForm.endTime}
+                        onChange={(e) => updateEditForm('endTime', e.target.value)}
+                        className="h-11 min-w-0 rounded-xl border border-line bg-night px-2"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-6 gap-y-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={editForm.isLastSlot}
+                        onChange={(e) => updateEditForm('isLastSlot', e.target.checked)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      กำหนดเป็นรอบสุดท้าย
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={editForm.unlimited}
+                        onChange={(e) => updateEditForm('unlimited', e.target.checked)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      เปิดให้บริการแพ็กเกจ Unlimited
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      disabled={savingId === slot.id}
+                      onClick={() => saveEdit(slot)}
+                      className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 font-semibold text-white"
+                    >
+                      <Save size={16} />
+                      บันทึก
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="flex h-10 items-center justify-center gap-2 rounded-xl bg-raised px-3"
+                    >
+                      <X size={16} />
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock3 size={19} className="text-primary" />
+                      <span className="font-display text-xl font-semibold">
+                        {slot.time}–{slot.endTime}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {slot.isLastSlot && (
+                        <span className="flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+                          <Flag size={13} />
+                          รอบสุดท้าย
+                        </span>
+                      )}
+                      {slot.unlimited && (
+                        <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">
+                          Unlimited
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Toggle
+                      label={`เปิดรับจองรอบ ${slot.time} ถึง ${slot.endTime}`}
+                      checked={slot.active}
+                      onChange={(value) => patch(slot, { active: value })}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      {!slot.isLastSlot && (
+                        <button
+                          onClick={() => setLastSlot(slot)}
+                          className="h-10 rounded-xl bg-primary/10 px-3 text-sm font-medium text-primary"
+                        >
+                          ตั้งเป็นรอบสุดท้าย
+                        </button>
+                      )}
+                      <button
+                        onClick={() => startEdit(slot)}
+                        className="h-10 rounded-xl bg-raised px-3 text-sm"
+                      >
+                        แก้ไข
+                      </button>
+                      <button
+                        aria-label={`ลบรอบ ${slot.time}`}
+                        onClick={() => setDel(slot)}
+                        className="grid h-10 w-10 place-items-center rounded-xl bg-bad/15 text-bad"
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>
-        {data.length === 0 && <p className="rounded-2xl border border-line bg-surface p-6 text-center text-sm text-mute">ยังไม่มีรอบเวลา — ลูกค้าจะจองไม่ได้จนกว่าจะเพิ่ม</p>}
+
+        {data.length === 0 && (
+          <p className="rounded-2xl border border-line bg-surface p-6 text-center text-sm text-mute">
+            ยังไม่มีรอบเวลา — ลูกค้าจะจองไม่ได้จนกว่าจะเพิ่ม
+          </p>
+        )}
       </section>
 
-      <Modal open={!!del} danger title="ลบรอบเวลานี้?" confirmLabel="ลบ" cancelLabel="ไม่ลบ" onCancel={() => setDel(null)} onConfirm={remove}>
-        รอบ {del?.time} จะหายจากหน้าลูกค้า (ถ้ายังมีการจองรอบนี้ที่ยังไม่ถึงเวลา ระบบจะไม่ให้ลบ ให้ปิดสวิตช์แทน)
+      <Modal
+        open={!!del}
+        danger
+        title="ลบรอบเวลานี้?"
+        confirmLabel="ลบ"
+        cancelLabel="ไม่ลบ"
+        onCancel={() => setDel(null)}
+        onConfirm={remove}
+      >
+        รอบ {del?.time}–{del?.endTime} จะถูกนำออกจากหน้าลูกค้า
+        หากมีการจองที่ยังไม่ถึงเวลา ระบบจะไม่อนุญาตให้ลบ
       </Modal>
     </div>
   )

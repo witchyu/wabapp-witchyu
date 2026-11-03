@@ -93,12 +93,14 @@ model Service {
   updatedAt   DateTime         @updatedAt
 }
 
-// รอบเวลา (HH:mm) และจำนวนคิวสูงสุดต่อรอบ
+// รอบเวลา: หนึ่งคนต่อหนึ่งช่วงเวลา
 model TimeSlot {
-  id       Int     @id @default(autoincrement())
-  time     String  @unique
-  capacity Int     @default(1)
-  active   Boolean @default(true)
+  id         Int     @id @default(autoincrement())
+  time       String  @unique
+  endTime    String
+  isLastSlot Boolean @default(false)
+  unlimited  Boolean @default(false)
+  active     Boolean @default(true)
 }
 
 model Booking {

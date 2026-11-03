@@ -44,7 +44,14 @@ export type AdminServiceInput = Omit<AdminService, 'id' | 'sortOrder' | 'categor
   categoryId?: string
 }
 
-export interface AdminSlot { id: number; time: string; capacity: number; active: boolean }
+export interface AdminSlot {
+  id: number
+  time: string
+  endTime: string
+  isLastSlot: boolean
+  unlimited: boolean
+  active: boolean
+}
 export interface AdminHours { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }
 export interface AdminHoliday { id: number; date: string; reason: string }
 export interface AdminSettings {

@@ -24,7 +24,13 @@ const SERVICES: ServiceRow[] = [
   svc('w-now', 'work', 129),
   svc('s-old', 'study', 129, { active: false }),
 ]
-const SLOTS: SlotRow[] = ['18:00', '19:00', '20:00', '21:00', '22:30'].map((time) => ({ time, capacity: 1, active: true }))
+const SLOTS: SlotRow[] = ['18:00', '19:00', '20:00', '21:00', '22:30'].map((time) => ({
+  time,
+  endTime: time === '22:30' ? '23:00' : `${String(Number(time.slice(0, 2)) + 1).padStart(2, '0')}:${time.slice(3, 5)}`,
+  isLastSlot: time === '22:30',
+  unlimited: time === '20:00',
+  active: true,
+}))
 const HOURS = { openTime: '18:00', closeTime: '23:00', isClosed: false }
 
 // 2026-10-04 19:30 เวลาไทย = 12:30 UTC
@@ -135,16 +141,34 @@ test('computeDaySlots: today past slots closed', () => {
   assert.deepEqual(day('2026-10-05').slots.map((s) => s.status), Array(5).fill('available'))
 })
 
-test('computeDaySlots: unlimited only 22:30', () => {
-  const s = day('2026-10-05', { unlimited: true }).slots
-  assert.deepEqual(s.map((x) => x.status), ['closed', 'closed', 'closed', 'closed', 'available'])
+test('computeDaySlots: unlimited uses its own flag, independent of Last Slot', () => {
+  const unlimitedSlots = day('2026-10-05', { unlimited: true }).slots
+  assert.deepEqual(
+    unlimitedSlots.map((x) => x.status),
+    ['closed', 'closed', 'available', 'closed', 'closed'],
+  )
+
+  const normalSlots = day('2026-10-05').slots
+  assert.deepEqual(normalSlots.map((x) => x.status), Array(5).fill('available'))
+
+  const unlimitedSlot = normalSlots.find((x) => x.time === '20:00')!
+  const lastSlot = normalSlots.find((x) => x.time === '22:30')!
+
+  assert.equal(unlimitedSlot.unlimited, true)
+  assert.equal(unlimitedSlot.isLastSlot, false)
+  assert.equal(lastSlot.isLastSlot, true)
+  assert.equal(lastSlot.unlimited, false)
 })
 
-test('computeDaySlots: capacity / full', () => {
-  assert.equal(day('2026-10-05', { counts: { '20:00': 1 } }).slots[2].status, 'full')
-  const two = SLOTS.map((s) => (s.time === '20:00' ? { ...s, capacity: 2 } : s))
-  assert.equal(day('2026-10-05', { slots: two, counts: { '20:00': 1 } }).slots[2].status, 'available')
-  assert.equal(day('2026-10-05', { slots: two, counts: { '20:00': 2 } }).slots[2].status, 'full')
+test('computeDaySlots: one active booking makes a slot full', () => {
+  assert.equal(
+    day('2026-10-05', { counts: { '20:00': 1 } }).slots[2].status,
+    'full',
+  )
+  assert.equal(
+    day('2026-10-05', { counts: { '20:00': 2 } }).slots[2].status,
+    'full',
+  )
 })
 
 test('computeDaySlots: holiday, closed weekday, inactive slot, outside hours', () => {
@@ -176,9 +200,9 @@ test('nextBookingId', () => {
 
 test('bookingEndMs / isEditable', () => {
   const start = startMs('2026-10-05', '20:00')
-  assert.equal(bookingEndMs('2026-10-05', '20:00', [{ durationMin: 30, unlimited: false }]), start + 60 * 60000)
-  assert.equal(bookingEndMs('2026-10-05', '20:00', [{ durationMin: 90, unlimited: false }]), start + 90 * 60000)
-  assert.equal(bookingEndMs('2026-10-05', '20:00', [{ durationMin: null, unlimited: true }]), start + 120 * 60000)
+  assert.equal(bookingEndMs('2026-10-05', '20:00', '21:00'), start + 60 * 60000)
+  assert.equal(bookingEndMs('2026-10-05', '20:00', '21:30'), start + 90 * 60000)
+  assert.equal(bookingEndMs('2026-10-05', '23:00', '00:30'), startMs('2026-10-06', '00:30'))
   const b = { status: 'confirmed', expiresAtMs: 0, date: '2026-10-05', time: '20:00' }
   assert.equal(isEditable(b, NOW_MS), true)
   assert.equal(isEditable(b, start + 1), false)

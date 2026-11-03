@@ -298,62 +298,108 @@ export async function deleteServiceCategory(id: string) {
 // ---------- รอบเวลา ----------
 export const listSlots = () => prisma.timeSlot.findMany({ orderBy: { time: 'asc' } })
 
-export async function createSlot(input: { time: string; capacity: number; active: boolean }) {
+export async function createSlot(input: {
+  time: string
+  endTime: string
+  isLastSlot: boolean
+  unlimited: boolean
+  active: boolean
+}) {
   try {
-    return await prisma.timeSlot.create({ data: input })
+    return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtext('witchyu-slot-admin'))
+      `
+      const slots = await tx.timeSlot.findMany()
+      const start = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
+      const duration = (a: string, b: string) => (start(b) - start(a) + 1440) % 1440
+      const next = duration(input.time, input.endTime)
+      if (next <= 0) throw new AppError(400, 'INVALID_SLOT_RANGE', 'เวลาเริ่มและเวลาสิ้นสุดต้องไม่ตรงกัน')
+
+      for (const slot of slots) {
+        const oldDuration = duration(slot.time, slot.endTime)
+        const a = start(input.time)
+        const b = a + next
+        const c = start(slot.time)
+        const d = c + oldDuration
+        for (const shift of [-1440, 0, 1440]) {
+          if (a < d + shift && c + shift < b) {
+            throw new AppError(409, 'SLOT_OVERLAP', `ช่วงเวลาซ้อนกับ ${slot.time}–${slot.endTime}`)
+          }
+        }
+      }
+
+      if (input.isLastSlot) {
+        await tx.timeSlot.updateMany({ where: { isLastSlot: true }, data: { isLastSlot: false } })
+      }
+      return tx.timeSlot.create({ data: input })
+    })
   } catch (e) {
-    if (isCode(e, 'P2002')) throw new AppError(409, 'SLOT_EXISTS', 'มีรอบเวลานี้อยู่แล้ว')
+    if (isCode(e, 'P2002')) throw new AppError(409, 'SLOT_EXISTS', 'มีเวลาเริ่มต้นนี้อยู่แล้ว')
     throw e
   }
 }
 
-export async function updateSlot(id: number, patch: { capacity?: number; active?: boolean }) {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      // ใช้ Row Lock เดียวกับ createBooking/updateBooking
-      await tx.$queryRaw`
-        SELECT "id"
-        FROM "TimeSlot"
-        WHERE "id" = ${id}
-        FOR UPDATE
-      `
+export async function updateSlot(
+  id: number,
+  patch: {
+    time?: string
+    endTime?: string
+    isLastSlot?: boolean
+    unlimited?: boolean
+    active?: boolean
+  },
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext('witchyu-slot-admin'))
+    `
+    await tx.$queryRaw`SELECT "id" FROM "TimeSlot" WHERE "id" = ${id} FOR UPDATE`
+    const slot = await tx.timeSlot.findUnique({ where: { id } })
+    if (!slot) throw notFound('รอบเวลา')
 
-      const slot = await tx.timeSlot.findUnique({ where: { id } })
-      if (!slot) throw notFound('รอบเวลา')
+    const time = patch.time ?? slot.time
+    const endTime = patch.endTime ?? slot.endTime
+    const hasFutureBooking = await tx.booking.count({
+      where: {
+        time: slot.time,
+        date: { gte: shopNow(Date.now()).date },
+        ...activeWhere(new Date()),
+      },
+    })
+    if (hasFutureBooking && (time !== slot.time || endTime !== slot.endTime || patch.active === false)) {
+      throw new AppError(409, 'SLOT_IN_USE', 'มีการจองรอบนี้อยู่ ไม่สามารถเปลี่ยนหรือลบรอบเวลาได้')
+    }
+    const duration = (a: string, b: string) => {
+      const x = Number(a.slice(0, 2)) * 60 + Number(a.slice(3, 5))
+      const y = Number(b.slice(0, 2)) * 60 + Number(b.slice(3, 5))
+      return (y - x + 1440) % 1440
+    }
+    if (duration(time, endTime) <= 0) {
+      throw new AppError(400, 'INVALID_SLOT_RANGE', 'เวลาเริ่มและเวลาสิ้นสุดต้องไม่ตรงกัน')
+    }
 
-      if (patch.capacity !== undefined) {
-        const now = new Date()
-        const today = shopNow(now.getTime()).date
-        const usageByDate = await tx.booking.groupBy({
-          by: ['date'],
-          where: {
-            time: slot.time,
-            date: { gte: today },
-            ...activeWhere(now),
-          },
-          _count: { _all: true },
-        })
-
-        const maxUsed = usageByDate.reduce(
-          (max, row) => Math.max(max, row._count._all),
-          0,
-        )
-
-        if (patch.capacity < maxUsed) {
-          throw new AppError(
-            409,
-            'CAPACITY_BELOW_BOOKINGS',
-            `ลด Capacity ไม่ได้ เพราะมีวันที่มีการจองรอบ ${slot.time} อยู่ ${maxUsed} คิว`,
-          )
+    const slots = await tx.timeSlot.findMany({ where: { id: { not: id } } })
+    const start = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
+    const a = start(time)
+    const b = a + duration(time, endTime)
+    for (const other of slots) {
+      const c = start(other.time)
+      const d = c + duration(other.time, other.endTime)
+      for (const shift of [-1440, 0, 1440]) {
+        if (a < d + shift && c + shift < b) {
+          throw new AppError(409, 'SLOT_OVERLAP', `ช่วงเวลาซ้อนกับ ${other.time}–${other.endTime}`)
         }
       }
+    }
 
-      return tx.timeSlot.update({ where: { id }, data: patch })
-    })
-  } catch (e) {
-    if (isCode(e, 'P2025')) throw notFound('รอบเวลา')
-    throw e
-  }
+
+
+    if (patch.isLastSlot) {
+      await tx.timeSlot.updateMany({ where: { isLastSlot: true, id: { not: id } }, data: { isLastSlot: false } })
+    }
+    return tx.timeSlot.update({ where: { id }, data: patch })
+  })
 }
 
 export async function deleteSlot(id: number) {

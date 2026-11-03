@@ -13,7 +13,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const host = new URL(process.env.DATABASE_URL).hostname
-const allowedHost = 'ep-rough-salad-b5hgpz6z-pooler.c-7.us-east-2.aws.neon.tech'
+const allowedHost = 'ep-twilight-dream-b5joxsvo-pooler.c-7.us-east-2.aws.neon.tech'
 
 if (host !== allowedHost) {
   throw new Error(`Unsafe test database host: ${host}`)
