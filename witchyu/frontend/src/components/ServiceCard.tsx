@@ -25,7 +25,7 @@ export default function ServiceCard({ svc, selected, disabled, disabledReason, c
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold">{svc.name}</h3>
             {svc.durationMin && <span className="flex items-center gap-1 text-xs text-mute"><Clock size={12} />{svc.durationMin} นาที</span>}
-            {svc.unlimited && <span className="flex items-center gap-1 text-xs text-gold"><Phone size={12} />รอบ 22:30</span>}
+            {svc.unlimited && <span className="flex items-center gap-1 text-xs text-gold"><Phone size={12} />โทรไม่จำกัด</span>}
           </div>
           {svc.desc && <p className="mt-1 text-sm text-mute">{svc.desc}</p>}
           {disabled && disabledReason && <p className="mt-1 text-xs text-warn">{disabledReason}</p>}

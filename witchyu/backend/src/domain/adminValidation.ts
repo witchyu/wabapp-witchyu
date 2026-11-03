@@ -162,7 +162,6 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
 export function parseSlotCreate(body: unknown): {
   time: string
   endTime: string
-  isLastSlot: boolean
   unlimited: boolean
   active: boolean
 } {
@@ -177,7 +176,6 @@ export function parseSlotCreate(body: unknown): {
   return {
     time: o.time,
     endTime: o.endTime,
-    isLastSlot: o.isLastSlot == null ? false : bool(o.isLastSlot, 'isLastSlot'),
     unlimited: o.unlimited == null ? false : bool(o.unlimited, 'unlimited'),
     active: o.active == null ? true : bool(o.active, 'สถานะ'),
   }
@@ -186,7 +184,6 @@ export function parseSlotCreate(body: unknown): {
 export function parseSlotPatch(body: unknown): {
   time?: string
   endTime?: string
-  isLastSlot?: boolean
   unlimited?: boolean
   active?: boolean
 } {
@@ -194,7 +191,6 @@ export function parseSlotPatch(body: unknown): {
   const out: {
     time?: string
     endTime?: string
-    isLastSlot?: boolean
     unlimited?: boolean
     active?: boolean
   } = {}
@@ -207,7 +203,6 @@ export function parseSlotPatch(body: unknown): {
     if (!isHHMM(o.endTime)) throw bad('รูปแบบเวลาสิ้นสุดไม่ถูกต้อง (HH:mm)')
     out.endTime = o.endTime
   }
-  if (o.isLastSlot !== undefined) out.isLastSlot = bool(o.isLastSlot, 'isLastSlot')
   if (o.unlimited !== undefined) out.unlimited = bool(o.unlimited, 'unlimited')
   if (o.active !== undefined) out.active = bool(o.active, 'สถานะ')
 

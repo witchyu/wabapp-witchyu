@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Save, Trash2, X, Clock3, Flag } from 'lucide-react'
+import { Plus, Save, Trash2, X, Clock3 } from 'lucide-react'
 import { adminApi } from '../../services/adminApi'
 import { errorMessage } from '../../services/api'
 import { useLoad } from '../../components/admin/useLoad'
@@ -12,13 +12,11 @@ import type { AdminSlot } from '../../types/admin'
 type SlotForm = {
   time: string
   endTime: string
-  isLastSlot: boolean
   unlimited: boolean
 }
 const emptyForm: SlotForm = {
   time: '',
   endTime: '',
-  isLastSlot: false,
   unlimited: false,
 }
 
@@ -72,9 +70,7 @@ export default function AdminSlots() {
     try {
       const slot = await adminApi.createSlot(form)
       setData(sortSlots([
-        ...data.map((item) =>
-          slot.isLastSlot ? { ...item, isLastSlot: false } : item
-        ),
+        ...data,
         slot,
       ]))
       setForm(emptyForm)
@@ -91,7 +87,6 @@ export default function AdminSlots() {
     setEditForm({
       time: slot.time,
       endTime: slot.endTime,
-      isLastSlot: slot.isLastSlot,
       unlimited: slot.unlimited,
     })
   }
@@ -110,7 +105,6 @@ export default function AdminSlots() {
       const updated = await adminApi.updateSlot(slot.id, editForm)
       setData(sortSlots(data.map((item) => {
         if (item.id === updated.id) return updated
-        if (updated.isLastSlot) return { ...item, isLastSlot: false }
         return item
       })))
       cancelEdit()
@@ -133,28 +127,6 @@ export default function AdminSlots() {
       setData(data.map((item) =>
         item.id === updated.id ? updated : item
       ))
-    } catch (e) {
-      setData(previous)
-      toast(errorMessage(e), 'error')
-    }
-  }
-
-  const setLastSlot = async (slot: AdminSlot) => {
-    const previous = data
-    setData(data.map((item) => ({
-      ...item,
-      isLastSlot: item.id === slot.id,
-    })))
-
-    try {
-      const updated = await adminApi.updateSlot(slot.id, {
-        isLastSlot: true,
-      })
-      setData(data.map((item) => ({
-        ...item,
-        isLastSlot: item.id === updated.id,
-      })))
-      toast('กำหนดรอบสุดท้ายแล้ว', 'success')
     } catch (e) {
       setData(previous)
       toast(errorMessage(e), 'error')
@@ -216,15 +188,6 @@ export default function AdminSlots() {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={form.isLastSlot}
-              onChange={(e) => updateForm('isLastSlot', e.target.checked)}
-              className="h-4 w-4 accent-primary"
-            />
-            กำหนดเป็นรอบสุดท้ายของวัน
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
               checked={form.unlimited}
               onChange={(e) => updateForm('unlimited', e.target.checked)}
               className="h-4 w-4 accent-primary"
@@ -277,15 +240,6 @@ export default function AdminSlots() {
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
-                        checked={editForm.isLastSlot}
-                        onChange={(e) => updateEditForm('isLastSlot', e.target.checked)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                      กำหนดเป็นรอบสุดท้าย
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
                         checked={editForm.unlimited}
                         onChange={(e) => updateEditForm('unlimited', e.target.checked)}
                         className="h-4 w-4 accent-primary"
@@ -322,12 +276,6 @@ export default function AdminSlots() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {slot.isLastSlot && (
-                        <span className="flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-                          <Flag size={13} />
-                          รอบสุดท้าย
-                        </span>
-                      )}
                       {slot.unlimited && (
                         <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">
                           Unlimited
@@ -344,14 +292,6 @@ export default function AdminSlots() {
                     />
 
                     <div className="flex items-center gap-2">
-                      {!slot.isLastSlot && (
-                        <button
-                          onClick={() => setLastSlot(slot)}
-                          className="h-10 rounded-xl bg-primary/10 px-3 text-sm font-medium text-primary"
-                        >
-                          ตั้งเป็นรอบสุดท้าย
-                        </button>
-                      )}
                       <button
                         onClick={() => startEdit(slot)}
                         className="h-10 rounded-xl bg-raised px-3 text-sm"

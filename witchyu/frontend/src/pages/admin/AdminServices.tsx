@@ -211,7 +211,7 @@ export default function AdminServices() {
                   <li key={s.id} className={`flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 ${s.active ? '' : 'opacity-60'}`}>
                     <div className="min-w-0 flex-1">
                       <div className="break-words font-medium">{s.name}{s.recommended && <span className="ml-2 rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">แนะนำ</span>}</div>
-                      <div className="text-sm text-gold">{s.price} บาท{s.perQuestion ? '/ข้อ' : ''}{s.durationMin ? ` · ${s.durationMin} นาที` : ''}{s.unlimited ? ' · รอบ 22:30' : ''}</div>
+                      <div className="text-sm text-gold">{s.price} บาท{s.perQuestion ? '/ข้อ' : ''}{s.durationMin ? ` · ${s.durationMin} นาที` : ''}{s.unlimited ? ' · โทรไม่จำกัด' : ''}</div>
                     </div>
                     <Toggle label={`เปิดใช้งาน ${s.name}`} checked={s.active} onChange={(v) => toggleActive(s, v)} />
                     <button aria-label={`แก้ไข ${s.name}`} onClick={() => setForm(fromService(s))} className="grid h-11 w-11 place-items-center rounded-xl bg-raised"><Pencil size={18} /></button>
@@ -270,7 +270,7 @@ export default function AdminServices() {
             </label>
             {([
               ['perQuestion', 'คิดราคาต่อข้อ (ลูกค้าระบุจำนวนคำถามเอง)'],
-              ['unlimited', 'จองได้เฉพาะรอบ 22:30 (โทรไม่จำกัด)'],
+              ['unlimited', 'จองได้เฉพาะรอบเวลาที่กำหนด'],
               ['active', 'เปิดให้ลูกค้าเห็นและจอง'],
               ['recommended', '⭐ แนะนำบนหน้าแรก'],
             ] as const).map(([k, label]) => (

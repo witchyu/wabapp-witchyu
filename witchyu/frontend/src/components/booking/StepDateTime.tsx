@@ -60,10 +60,6 @@ export default function StepDateTime() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.date, idsKey, reloadKey])
 
-  const lastSlot =
-    state.status === 'ready'
-      ? state.data.slots.find((slot) => slot.isLastSlot)
-      : undefined
 
   return (
     <div>
@@ -94,15 +90,15 @@ export default function StepDateTime() {
 
       <h3 className="mb-2 mt-5 text-sm text-mute">เลือกเวลา</h3>
 
-      {unlimited && lastSlot && (
+      {unlimited && state.status === 'ready' && (
         <p className="mb-3 rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">
-          บริการโทรไม่จำกัด จองได้เฉพาะรอบสุดท้ายที่ร้านกำหนด ({lastSlot.time}–{lastSlot.endTime})
+          บริการโทรไม่จำกัด เลือกได้เฉพาะรอบที่ร้านเปิดให้บริการ Unlimited
         </p>
       )}
 
-      {unlimited && !lastSlot && state.status === 'ready' && (
+      {unlimited && state.status === 'ready' && !state.data.slots.some((slot) => slot.unlimited) && (
         <p className="mb-3 rounded-xl bg-bad/10 px-3 py-2 text-sm text-bad">
-          ยังไม่มีรอบสุดท้ายที่ร้านกำหนด
+          ขณะนี้ยังไม่มีรอบเวลาที่เปิดให้บริการ Unlimited กรุณาติดต่อร้าน
         </p>
       )}
 

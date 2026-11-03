@@ -301,7 +301,6 @@ export const listSlots = () => prisma.timeSlot.findMany({ orderBy: { time: 'asc'
 export async function createSlot(input: {
   time: string
   endTime: string
-  isLastSlot: boolean
   unlimited: boolean
   active: boolean
 }) {
@@ -329,9 +328,6 @@ export async function createSlot(input: {
         }
       }
 
-      if (input.isLastSlot) {
-        await tx.timeSlot.updateMany({ where: { isLastSlot: true }, data: { isLastSlot: false } })
-      }
       return tx.timeSlot.create({ data: input })
     })
   } catch (e) {
@@ -345,7 +341,6 @@ export async function updateSlot(
   patch: {
     time?: string
     endTime?: string
-    isLastSlot?: boolean
     unlimited?: boolean
     active?: boolean
   },
@@ -395,9 +390,6 @@ export async function updateSlot(
 
 
 
-    if (patch.isLastSlot) {
-      await tx.timeSlot.updateMany({ where: { isLastSlot: true, id: { not: id } }, data: { isLastSlot: false } })
-    }
     return tx.timeSlot.update({ where: { id }, data: patch })
   })
 }

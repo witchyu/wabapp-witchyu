@@ -17,7 +17,7 @@ export interface Service {
   desc: string
   price: number            // บาท (ต่อคำถาม ถ้า perQuestion = true)
   durationMin?: number
-  unlimited?: boolean      // จองได้เฉพาะ 22:30
+  unlimited?: boolean      // เลือกได้เฉพาะรอบที่เปิด Unlimited
   perQuestion?: boolean    // บริการ "จำนวนคำถามกำหนดเอง"
   questions?: string[]     // รายการคำถามในเซ็ต (แสดงใน "ดูรายละเอียด")
   active: boolean          // Phase 4: Admin เปิด/ปิดได้
