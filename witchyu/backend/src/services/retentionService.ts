@@ -1,5 +1,6 @@
 import { prisma } from '../db'
 import { config } from '../config'
+import { cleanupExpiredPaymentProofs } from './paymentProofService'
 
 function cutoffDays(days: number, now = Date.now()): Date {
   return new Date(now - Math.max(0, days) * 24 * 60 * 60 * 1000)
@@ -20,6 +21,14 @@ export async function cleanupExpiredData(now = Date.now()) {
   const callCutoff = cutoffDays(callDays, now)
   const bookingCutoff = cutoffDays(bookingDays, now)
   const customerCutoff = cutoffDays(customerDays, now)
+
+  // PaymentProof ใช้นโยบายเก็บหลักฐาน 30 วัน
+  const paymentProofDays = 30
+  const paymentProofCutoff = cutoffDays(paymentProofDays, now)
+  const paymentProofCleanup = await cleanupExpiredPaymentProofs(
+    paymentProofCutoff,
+  )
+
 
   // ลบข้อความเก่าก่อน เพื่อไม่ให้เหลือข้อมูลที่อ้างถึง Booking ที่จะถูกลบ
   const deletedMessages = await prisma.message.deleteMany({
@@ -59,6 +68,9 @@ export async function cleanupExpiredData(now = Date.now()) {
       calls: {
         none: {},
       },
+      paymentProofs: {
+        none: {},
+      },
     },
   })
 
@@ -83,7 +95,9 @@ export async function cleanupExpiredData(now = Date.now()) {
     deletedBookings: deletedBookings.count,
     deletedCustomers: deletedCustomers.count,
     deletedSystemLogs: deletedSystemLogs.count,
+    paymentProofCleanup,
     retention: {
+      paymentProofDays,
       customerDataDays: customerDays,
       bookingDays: bookingDays,
       chatDays: chatDays,

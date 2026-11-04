@@ -1,6 +1,11 @@
 import { safeCreateNotification } from './notificationService'
 import { prisma } from '../db'
 import { AppError } from '../domain/errors'
+import {
+  uploadPrivatePaymentProof,
+  downloadPrivatePaymentProof,
+  deletePrivatePaymentProof,
+} from './cloudinaryService'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -93,24 +98,153 @@ export async function uploadPaymentProof(
     throw new AppError(409, 'PROOF_ALREADY_PENDING', 'มีสลิปรอตรวจสอบอยู่แล้ว')
   }
 
-  return prisma.paymentProof.create({
-    data: {
-      bookingId,
-      mimeType: file.mimetype,
-      data: file.buffer,
-      originalName: file.originalname.slice(0, 255),
-      size: file.size,
+  const uploaded = await uploadPrivatePaymentProof(
+    file.buffer,
+    bookingId,
+    file.mimetype,
+  )
+
+  try {
+    return await prisma.paymentProof.create({
+      data: {
+        bookingId,
+        mimeType: file.mimetype,
+        data: null,
+        storageProvider: 'cloudinary',
+        cloudinaryPublicId: uploaded.publicId,
+        cloudinaryResourceType: uploaded.resourceType,
+        cloudinaryDeliveryType: uploaded.deliveryType,
+        originalName: file.originalname.slice(0, 255),
+        size: file.size,
+      },
+      select: {
+        id: true,
+        bookingId: true,
+        mimeType: true,
+        originalName: true,
+        size: true,
+        status: true,
+        submittedAt: true,
+      },
+    })
+  } catch (error) {
+    try {
+      await deletePrivatePaymentProof(
+        uploaded.publicId,
+        uploaded.resourceType,
+      )
+    } catch (cleanupError) {
+      console.error(
+        '[payment-proof] orphaned Cloudinary upload; cleanup required',
+        {
+          bookingId,
+          publicId: uploaded.publicId,
+          error: cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError),
+        },
+      )
+    }
+
+    throw error
+  }
+}
+
+
+type StoredProof = {
+  mimeType: string
+  data: Uint8Array | null
+  storageProvider: string
+  cloudinaryPublicId: string | null
+  cloudinaryResourceType: string | null
+  cloudinaryDeliveryType: string | null
+}
+
+async function readStoredProof(proof: StoredProof): Promise<Buffer> {
+  if (proof.storageProvider === 'database') {
+    if (!proof.data) {
+      throw new AppError(404, 'PROOF_FILE_NOT_FOUND', 'ไม่พบไฟล์สลิป')
+    }
+    return Buffer.from(proof.data)
+  }
+
+  if (
+    proof.storageProvider === 'cloudinary' &&
+    proof.cloudinaryPublicId
+  ) {
+    return downloadPrivatePaymentProof(
+      proof.cloudinaryPublicId,
+      proof.mimeType,
+      proof.cloudinaryResourceType ?? 'image',
+      proof.cloudinaryDeliveryType ?? 'authenticated',
+    )
+  }
+
+  throw new AppError(
+    500,
+    'INVALID_PROOF_STORAGE',
+    'ข้อมูลตำแหน่งจัดเก็บสลิปไม่ถูกต้อง',
+  )
+}
+
+async function deleteStoredProofFile(proof: StoredProof) {
+  if (proof.storageProvider === 'database') return
+
+  if (
+    proof.storageProvider === 'cloudinary' &&
+    proof.cloudinaryPublicId
+  ) {
+    await deletePrivatePaymentProof(
+      proof.cloudinaryPublicId,
+      proof.cloudinaryResourceType ?? 'image',
+    )
+    return
+  }
+
+  throw new AppError(
+    500,
+    'INVALID_PROOF_STORAGE',
+    'ข้อมูลตำแหน่งจัดเก็บสลิปไม่ถูกต้อง',
+  )
+}
+
+export async function getCustomerPaymentProofImage(
+  bookingId: string,
+  clientId: string,
+  proofId: string,
+) {
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      user: { clientId },
     },
+    select: { id: true },
+  })
+
+  if (!booking) {
+    throw new AppError(404, 'BOOKING_NOT_FOUND', 'ไม่พบรายการจอง')
+  }
+
+  const proof = await prisma.paymentProof.findFirst({
+    where: { id: proofId, bookingId },
     select: {
-      id: true,
-      bookingId: true,
       mimeType: true,
-      originalName: true,
-      size: true,
-      status: true,
-      submittedAt: true,
+      data: true,
+      storageProvider: true,
+      cloudinaryPublicId: true,
+      cloudinaryResourceType: true,
+      cloudinaryDeliveryType: true,
     },
   })
+
+  if (!proof) {
+    throw new AppError(404, 'PROOF_NOT_FOUND', 'ไม่พบสลิป')
+  }
+
+  return {
+    mimeType: proof.mimeType,
+    data: await readStoredProof(proof),
+  }
 }
 
 export async function getCustomerPaymentProof(
@@ -158,6 +292,7 @@ export async function deleteCustomerPaymentProof(
     include: {
       paymentProofs: {
         where: { status: 'pending' },
+        orderBy: { submittedAt: 'desc' },
       },
     },
   })
@@ -172,34 +307,24 @@ export async function deleteCustomerPaymentProof(
     throw new AppError(404, 'PROOF_NOT_FOUND', 'ไม่พบสลิปที่รอการตรวจสอบ')
   }
 
-  await prisma.paymentProof.delete({
-    where: { id: proof.id },
-  })
+  await deleteStoredProofFile(proof)
+  await prisma.paymentProof.delete({ where: { id: proof.id } })
 
   return { ok: true }
 }
-
 
 export async function getAdminPaymentProof(bookingId: string) {
   const proof = await prisma.paymentProof.findFirst({
     where: { bookingId },
     orderBy: { submittedAt: 'desc' },
-    select: {
-      id: true,
-      bookingId: true,
-      mimeType: true,
-      data: true,
-      originalName: true,
-      size: true,
-      status: true,
-      submittedAt: true,
-      reviewedAt: true,
-      reviewNote: true,
-    },
   })
 
   if (!proof) throw new AppError(404, 'PROOF_NOT_FOUND', 'ไม่พบสลิป')
-  return proof
+
+  return {
+    ...proof,
+    data: await readStoredProof(proof),
+  }
 }
 
 export async function reviewPaymentProof(
@@ -285,6 +410,56 @@ export async function deleteAdminPaymentProof(bookingId: string) {
 
   if (!proof) throw new AppError(404, 'PROOF_NOT_FOUND', 'ไม่พบสลิป')
 
+  await deleteStoredProofFile(proof)
   await prisma.paymentProof.delete({ where: { id: proof.id } })
+
   return { ok: true }
+}
+
+
+/**
+ * ลบหลักฐานการชำระเงินที่มีอายุครบตาม cutoff
+ * ลบไฟล์จริงก่อน แล้วจึงลบข้อมูลในฐานข้อมูล
+ * หากลบไฟล์ไม่สำเร็จ จะเก็บข้อมูลไว้เพื่อลองใหม่รอบถัดไป
+ */
+export async function cleanupExpiredPaymentProofs(cutoff: Date) {
+  const expiredProofs = await prisma.paymentProof.findMany({
+    where: {
+      submittedAt: { lt: cutoff },
+    },
+    select: {
+      id: true,
+      mimeType: true,
+      data: true,
+      storageProvider: true,
+      cloudinaryPublicId: true,
+      cloudinaryResourceType: true,
+      cloudinaryDeliveryType: true,
+    },
+  })
+
+  let deleted = 0
+  let failed = 0
+
+  for (const proof of expiredProofs) {
+    try {
+      await deleteStoredProofFile(proof)
+      await prisma.paymentProof.delete({
+        where: { id: proof.id },
+      })
+      deleted += 1
+    } catch (error) {
+      failed += 1
+      console.error('[payment-proof] retention deletion failed', {
+        proofId: proof.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return {
+    checked: expiredProofs.length,
+    deleted,
+    failed,
+  }
 }

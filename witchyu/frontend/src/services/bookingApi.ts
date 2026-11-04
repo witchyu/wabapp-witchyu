@@ -30,7 +30,20 @@ export const bookingApi = {
   update: (id: string, p: UpdateBookingPayload) => api.patch<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}`, p).then((r) => r.booking),
   cancel: (id: string) => api.post<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}/cancel`).then((r) => r.booking),
   paymentProofs: (id: string) =>
-    api.get<{ proofs: { id: string; status: string; createdAt: number }[] }>(`/bookings/${encodeURIComponent(id)}/payment-slip`).then((r) => r.proofs),
+    api.get<{ proofs: {
+      id: string
+      mimeType: string
+      originalName: string
+      size: number
+      status: string
+      submittedAt: string
+      reviewedAt?: string | null
+      reviewNote?: string | null
+    }[] }>(`/bookings/${encodeURIComponent(id)}/payment-slip`).then((r) => r.proofs),
+  paymentProofImage: (bookingId: string, proofId: string) =>
+    api.getBlob(
+      `/bookings/${encodeURIComponent(bookingId)}/payment-slip/${encodeURIComponent(proofId)}/image`,
+    ),
   uploadPaymentProof: (id: string, file: File) =>
     api.upload<{ proof: { id: string; status: string } }>(`/bookings/${encodeURIComponent(id)}/payment-slip`, file).then((r) => r.proof),
   deletePaymentProof: (id: string) =>

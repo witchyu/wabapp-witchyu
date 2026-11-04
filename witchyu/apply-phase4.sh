@@ -1,4 +1,32 @@
-#!/usr/bin/env bash
+cd /workspaces/wabapp-witchyu/witchyu
+
+python3 - <<'PY'
+from pathlib import Path
+
+p = Path("frontend/src/components/PageHeader.tsx")
+s = p.read_text()
+
+old = """  return (
+    <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-night/90 px-3 pb-3 backdrop-blur" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+"""
+
+new = """  return (
+    <header
+      className="sticky top-0 z-20 mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-line bg-night/90 px-3 pb-3 shadow-sm backdrop-blur"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+    >
+"""
+
+if old not in s:
+    raise SystemExit("ไม่พบ PageHeader เดิม — หยุดเพื่อป้องกันแก้ผิดจุด")
+
+p.write_text(s.replace(old, new))
+print("PATCHED: 4H-2 Rounded Header")
+PY
+
+echo ""
+echo "===== VERIFY 4H-2 ====="
+sed -n '1,120p' frontend/src/components/PageHeader.tsx#!/usr/bin/env bash
 # ติดตั้ง Phase 4 ทับโปรเจกต์เดิมอย่างปลอดภัย
 #
 # วิธีใช้: ยืนอยู่ใน "โฟลเดอร์โปรเจกต์ของคุณ" (โฟลเดอร์ที่มี frontend/ และ backend/ อยู่ข้างใน) แล้วรัน

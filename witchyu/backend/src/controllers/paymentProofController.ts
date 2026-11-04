@@ -25,3 +25,18 @@ export const remove = asyncHandler(async (req: Request, res: Response): Promise<
   const result = await paymentProofs.deleteCustomerPaymentProof(bookingIdOf(req), clientIdOf(req))
   res.json(result)
 })
+
+export const image = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const result = await paymentProofs.getCustomerPaymentProofImage(
+    bookingIdOf(req),
+    clientIdOf(req),
+    String(req.params.proofId),
+  )
+
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.setHeader('Content-Type', result.mimeType)
+  res.setHeader('Content-Length', String(result.data.length))
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Content-Disposition', 'inline')
+  res.send(result.data)
+})

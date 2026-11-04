@@ -144,19 +144,23 @@ model Admin {
 }
 
 model PaymentProof {
-  id                String             @id @default(cuid())
-  bookingId         String
-  booking           Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  mimeType          String
-  data              Bytes
-  originalName      String
-  size              Int
-  status            PaymentProofStatus @default(pending)
-  submittedAt       DateTime           @default(now())
-  reviewedAt        DateTime?
-  reviewNote        String?
-  reviewedByAdminId String?
-  reviewedBy        Admin?             @relation(fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  id                      String             @id @default(cuid())
+  bookingId               String
+  booking                 Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mimeType                String
+  data                    Bytes?
+  storageProvider         String             @default("database")
+  cloudinaryPublicId      String?
+  cloudinaryResourceType  String?
+  cloudinaryDeliveryType  String?
+  originalName            String
+  size                    Int
+  status                  PaymentProofStatus @default(pending)
+  submittedAt             DateTime           @default(now())
+  reviewedAt              DateTime?
+  reviewNote              String?
+  reviewedByAdminId       String?
+  reviewedBy              Admin?             @relation(fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([bookingId, status])
   @@index([submittedAt])

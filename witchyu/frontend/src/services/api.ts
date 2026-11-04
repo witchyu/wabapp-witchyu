@@ -61,6 +61,40 @@ async function get<T>(path: string, extra?: Record<string, string>): Promise<T> 
   }
 }
 
+async function getBlob(path: string): Promise<Blob> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 60000)
+
+  try {
+    const res = await fetch(`${BASE}/api${path}`, {
+      method: 'GET',
+      headers: {
+        'X-Client-Id': getClientId(),
+        ...(getCustomerToken() ? { Authorization: `Bearer ${getCustomerToken()}` } : {}),
+      },
+      signal: ctrl.signal,
+    })
+
+    if (!res.ok) {
+      let data: unknown = null
+      try { data = await res.json() } catch {}
+      const err = (data as { error?: { code?: string; message?: string } } | null)?.error
+      throw new ApiError(
+        res.status,
+        err?.code ?? `HTTP_${res.status}`,
+        err?.message ?? 'ไม่สามารถโหลดรูปสลิปได้',
+      )
+    }
+
+    return await res.blob()
+  } catch (e) {
+    if (e instanceof ApiError) throw e
+    throw new ApiError(0, 'NETWORK', 'เชื่อมต่อเซิร์ฟเวอร์เพื่อโหลดรูปสลิปไม่ได้')
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 
 async function upload<T>(path: string, file: File): Promise<T> {
   const ctrl = new AbortController()
@@ -96,6 +130,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
 export const api = {
   upload,
   get,
+  getBlob,
   post: <T>(path: string, body?: unknown, extra?: Record<string, string>) => once<T>('POST', path, body ?? {}, extra),
   patch: <T>(path: string, body: unknown, extra?: Record<string, string>) => once<T>('PATCH', path, body, extra),
   put: <T>(path: string, body: unknown, extra?: Record<string, string>) => once<T>('PUT', path, body, extra),
