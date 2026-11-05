@@ -127,7 +127,6 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
     {
       time: '20:30',
       endTime: '21:00',
-      isLastSlot: false,
       unlimited: false,
       active: true,
     },
@@ -143,7 +142,6 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
     {
       time: '22:00',
       endTime: '23:00',
-      isLastSlot: true,
       unlimited: true,
       active: false,
     },
@@ -152,7 +150,7 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
   assert.equal(code(() => parseSlotCreate({ time: '20:00', endTime: '20:00' })), 'VALIDATION')
   assert.equal(code(() => parseSlotCreate({ time: '20:00' })), 'VALIDATION')
   assert.deepEqual(parseSlotPatch({ unlimited: true }), { unlimited: true })
-  assert.deepEqual(parseSlotPatch({ isLastSlot: true, active: false }), { isLastSlot: true, active: false })
+  assert.deepEqual(parseSlotPatch({ isLastSlot: true, active: false }), { active: false })
   assert.equal(code(() => parseSlotPatch({ unlimited: 'yes' })), 'VALIDATION')
   assert.equal(code(() => parseSlotPatch({ time: '25:00' })), 'VALIDATION')
   assert.equal(code(() => parseSlotPatch({ time: '10:00', endTime: '10:00' })), 'VALIDATION')

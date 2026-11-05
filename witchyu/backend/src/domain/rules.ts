@@ -150,6 +150,7 @@ export function computeDaySlots(a: {
       let status: SlotState
 
       if (!s.active || finish <= start) status = 'closed'
+      else if (start < open || finish > close) status = 'closed'
       else if (a.date === a.now.date && start <= a.now.minutes) status = 'closed'
       else if (a.unlimited && !s.unlimited) status = 'closed'
       else if ((a.counts[s.time] ?? 0) > 0) status = 'full'
