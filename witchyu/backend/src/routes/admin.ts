@@ -9,6 +9,14 @@ adminRoutes.post('/login', c.login)
 
 // ต่อจากนี้ต้องล็อกอินแอดมินแล้วเท่านั้น
 adminRoutes.use(requireAdmin)
+
+import * as queueController from '../controllers/manualQueueController'
+
+adminRoutes.get('/manual-queue', queueController.getManualQueue)
+adminRoutes.patch('/manual-queue/settings', queueController.updateManualQueueSettings)
+adminRoutes.post('/manual-queue/entries', queueController.createManualQueueEntry)
+adminRoutes.patch('/manual-queue/entries/:id', queueController.updateManualQueueEntry)
+adminRoutes.delete('/manual-queue/entries/:id', queueController.deleteManualQueueEntry)
 adminRoutes.get('/me', c.me)
 adminRoutes.get('/dashboard', c.dashboard)
 

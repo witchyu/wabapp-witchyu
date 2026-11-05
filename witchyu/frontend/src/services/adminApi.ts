@@ -38,11 +38,90 @@ async function guard<T>(fn: () => Promise<T>): Promise<T> {
 
 const A = '/admin'
 
+export type ManualQueueEntry = {
+  id: string
+  type: 'text' | 'call'
+  time: string
+  detail: string
+  status: 'available' | 'full'
+  createdAt: string
+  updatedAt: string
+}
+
+export type ManualQueueSettings = {
+  id: number
+  textTitle: string
+  textDescription: string
+  callTitle: string
+  callDescription: string
+  showCall: boolean
+}
+
+export type ManualQueueResponse = {
+  date: string
+  settings: ManualQueueSettings
+  day: {
+    id: string | null
+    date: string
+    entries: ManualQueueEntry[]
+  }
+}
+
+export type ManualQueueSettingsPatch = Partial<
+  Pick<ManualQueueSettings,
+    'textTitle' | 'textDescription' | 'callTitle' | 'callDescription' | 'showCall'
+  >
+>
+
+
 export const adminApi = {
   login: (username: string, password: string) =>
     api.post<{ token: string; expiresAt: number; admin: { username: string; displayName: string } }>(`${A}/login`, { username, password }),
   me: () => guard(() => api.get<{ admin: { displayName: string } }>(`${A}/me`, auth())),
   dashboard: () => guard(() => api.get<AdminDashboard>(`${A}/dashboard`, auth())),
+
+  manualQueue: (date: string) =>
+    guard(() => api.get<ManualQueueResponse>(
+      `${A}/manual-queue?date=${encodeURIComponent(date)}`,
+      auth(),
+    )),
+
+  updateManualQueueSettings: (patch: ManualQueueSettingsPatch) =>
+    guard(() => api.patch<{ settings: ManualQueueSettings }>(
+      `${A}/manual-queue/settings`,
+      patch,
+      auth(),
+    )).then((r) => r.settings),
+
+  createManualQueueEntry: (input: {
+    date: string
+    type: 'text' | 'call'
+    time: string
+    detail?: string
+  }) =>
+    guard(() => api.post<{ entry: ManualQueueEntry }>(
+      `${A}/manual-queue/entries`,
+      input,
+      auth(),
+    )).then((r) => r.entry),
+
+  updateManualQueueEntry: (
+    id: string,
+    date: string,
+    patch: { time?: string; detail?: string; status?: 'available' | 'full' },
+  ) =>
+    guard(() => api.patch<{ entry: ManualQueueEntry }>(
+      `${A}/manual-queue/entries/${encodeURIComponent(id)}`,
+      { date, ...patch },
+      auth(),
+    )).then((r) => r.entry),
+
+  deleteManualQueueEntry: (id: string) =>
+    guard(() => api.del<{ ok: true }>(
+      `${A}/manual-queue/entries/${encodeURIComponent(id)}`,
+      auth(),
+    )),
+
 
   bookings: (q: { status: AdminBookingFilter; date: string; search: string; page: number }) => {
     const p = new URLSearchParams({ status: q.status, page: String(q.page) })

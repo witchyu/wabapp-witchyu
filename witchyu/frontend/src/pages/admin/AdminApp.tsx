@@ -6,6 +6,7 @@ import Dashboard from './Dashboard'
 import AdminBookings from './AdminBookings'
 import AdminServices from './AdminServices'
 import AdminSlots from './AdminSlots'
+import AdminQueueUpdate from './AdminQueueUpdate'
 import AdminHours from './AdminHours'
 import AdminHolidays from './AdminHolidays'
 import AdminChats from './AdminChats'
@@ -22,6 +23,7 @@ export default function AdminApp() {
           <Route path="bookings" element={<AdminBookings />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="slots" element={<AdminSlots />} />
+          <Route path="queue-update" element={<AdminQueueUpdate />} />
           <Route path="hours" element={<AdminHours />} />
           <Route path="holidays" element={<AdminHolidays />} />
           <Route path="chat" element={<AdminChats />} />

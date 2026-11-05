@@ -13,6 +13,7 @@ const TABS = [
   { to: '/admin/chat', label: 'แชต', badge: true },
   { to: '/admin/services', label: 'บริการ' },
   { to: '/admin/slots', label: 'รอบเวลา' },
+  { to: '/admin/queue-update', label: 'อัพเดทคิว' },
   { to: '/admin/hours', label: 'เวลาทำการ' },
   { to: '/admin/holidays', label: 'วันหยุด' },
 ]
