@@ -55,6 +55,7 @@ export type ManualQueueSettings = {
   callTitle: string
   callDescription: string
   showCall: boolean
+  imageDesigns?: Record<string, Record<string, unknown>>
 }
 
 export type ManualQueueResponse = {
@@ -69,7 +70,7 @@ export type ManualQueueResponse = {
 
 export type ManualQueueSettingsPatch = Partial<
   Pick<ManualQueueSettings,
-    'textTitle' | 'textDescription' | 'callTitle' | 'callDescription' | 'showCall'
+    'textTitle' | 'textDescription' | 'callTitle' | 'callDescription' | 'showCall' | 'imageDesigns'
   >
 >
 

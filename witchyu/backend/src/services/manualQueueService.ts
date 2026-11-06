@@ -18,6 +18,7 @@ const defaultSettings = {
   callTitle: 'คิวโทร',
   callDescription: 'จัดการเวลาสำหรับบริการแบบโทร',
   showCall: true,
+  imageDesigns: {},
 }
 
 export async function getManualQueue(date: string) {
@@ -36,7 +37,10 @@ export async function getManualQueue(date: string) {
 
   return {
     date,
-    settings: settings ?? defaultSettings,
+    settings: {
+      ...(settings ?? defaultSettings),
+      imageDesigns: settings?.imageDesigns ?? {},
+    },
     day: {
       id: null,
       date,
@@ -66,6 +70,9 @@ export async function updateManualQueueSettings(
         ? patch.callDescription : defaultSettings.callDescription,
       showCall: typeof patch.showCall === 'boolean'
         ? patch.showCall : defaultSettings.showCall,
+      ...(patch.imageDesigns !== undefined
+        ? { imageDesigns: patch.imageDesigns }
+        : {}),
     },
   })
 }

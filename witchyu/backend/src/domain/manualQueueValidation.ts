@@ -82,6 +82,7 @@ export function parseQueueSettingsPatch(body: unknown) {
     callTitle?: string
     callDescription?: string
     showCall?: boolean
+    imageDesigns?: Record<string, Record<string, unknown>>
   } = {}
 
   if (b.textTitle !== undefined) patch.textTitle = text(b.textTitle, 'ชื่อคิวพิมพ์', 60)
@@ -91,6 +92,22 @@ export function parseQueueSettingsPatch(body: unknown) {
   if (b.showCall !== undefined) {
     if (typeof b.showCall !== 'boolean') throw bad('showCall ต้องเป็น true หรือ false')
     patch.showCall = b.showCall
+  }
+
+  if (b.imageDesigns !== undefined) {
+    const designs = object(b.imageDesigns)
+    if (Object.keys(designs).length > 366) throw bad('จำนวนวันที่บันทึกแบบภาพคิวมากเกินไป')
+
+    const parsed: Record<string, Record<string, unknown>> = {}
+    for (const [date, design] of Object.entries(designs)) {
+      parseQueueDate(date)
+      parsed[date] = object(design)
+    }
+
+    if (JSON.stringify(parsed).length > 50000) {
+      throw bad('ข้อมูลการออกแบบภาพคิวมีขนาดใหญ่เกินไป')
+    }
+    patch.imageDesigns = parsed
   }
 
   if (Object.keys(patch).length === 0) throw bad('ไม่มีการตั้งค่าที่ต้องการแก้ไข')

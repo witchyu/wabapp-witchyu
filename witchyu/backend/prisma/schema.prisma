@@ -290,6 +290,7 @@ model ManualQueueSetting {
   callTitle       String   @default("คิวโทร")
   callDescription String   @default("จัดการเวลาสำหรับบริการแบบโทร")
   showCall        Boolean  @default(true)
+  imageDesigns    Json?
   updatedAt       DateTime @updatedAt
 }
 
