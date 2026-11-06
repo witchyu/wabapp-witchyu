@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { AppError } from './errors'
 
 const bad = (message: string, code = 'VALIDATION') =>
@@ -82,7 +83,7 @@ export function parseQueueSettingsPatch(body: unknown) {
     callTitle?: string
     callDescription?: string
     showCall?: boolean
-    imageDesigns?: Record<string, Record<string, unknown>>
+    imageDesigns?: Prisma.InputJsonValue
   } = {}
 
   if (b.textTitle !== undefined) patch.textTitle = text(b.textTitle, 'ชื่อคิวพิมพ์', 60)
@@ -107,7 +108,7 @@ export function parseQueueSettingsPatch(body: unknown) {
     if (JSON.stringify(parsed).length > 50000) {
       throw bad('ข้อมูลการออกแบบภาพคิวมีขนาดใหญ่เกินไป')
     }
-    patch.imageDesigns = parsed
+    patch.imageDesigns = parsed as Prisma.InputJsonValue
   }
 
   if (Object.keys(patch).length === 0) throw bad('ไม่มีการตั้งค่าที่ต้องการแก้ไข')
