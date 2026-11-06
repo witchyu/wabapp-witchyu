@@ -53,6 +53,8 @@ function QueueSection({
   onAdd,
   onUpdate,
   onDelete,
+  disabledTimes,
+  onToggleTime,
 }: {
   type: QueueType
   config: QueueConfig
@@ -61,6 +63,8 @@ function QueueSection({
   onAdd: (time: string, detail: string) => Promise<void>
   onUpdate: (id: string, patch: Partial<QueueEntry>) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  disabledTimes: string[]
+  onToggleTime: (time: string) => Promise<void>
 }) {
   const [newTime, setNewTime] = useState('')
   const [newDetail, setNewDetail] = useState('')
@@ -250,6 +254,21 @@ function QueueSection({
                       </button>
                       <button
                         type="button"
+                        onClick={() => { void onToggleTime(entry.time) }}
+                        aria-label={`${disabledTimes.includes(entry.time) ? 'เปิดรับ' : 'ปิดรับ'} เวลา ${entry.time}`}
+                        aria-pressed={!disabledTimes.includes(entry.time)}
+                        className={`flex h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold ${
+                          disabledTimes.includes(entry.time)
+                            ? 'bg-rose-500/15 text-rose-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        }`}
+                      >
+                        {disabledTimes.includes(entry.time)
+                          ? <><EyeOff size={15} />ปิดรับ</>
+                          : <><Eye size={15} />รับคิว</>}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setEditingId(entry.id)
                           setEditTime(entry.time)
@@ -295,6 +314,8 @@ export default function AdminQueueUpdate() {
   const [textEntries, setTextEntries] = useState<QueueEntry[]>([])
   const [callEntries, setCallEntries] = useState<QueueEntry[]>([])
   const [showCall, setShowCall] = useState(true)
+  const [imageDesigns, setImageDesigns] = useState<Record<string, Record<string, unknown>>>({})
+  const disabledSlots = (imageDesigns[selectedDate]?.disabledSlots as string[] | undefined) ?? []
   const [configs, setConfigs] = useState<Record<QueueType, QueueConfig>>({
     text: {
       title: 'คิวพิมพ์',
@@ -342,6 +363,7 @@ export default function AdminQueueUpdate() {
           },
         })
         setShowCall(result.settings.showCall)
+        setImageDesigns(result.settings.imageDesigns ?? {})
       } catch (e) {
         if (active) setError(errorMessage(e))
       } finally {
@@ -352,6 +374,31 @@ export default function AdminQueueUpdate() {
     void load()
     return () => { active = false }
   }, [selectedDate])
+
+  const toggleSlot = async (type: QueueType, time: string) => {
+    const key = `${type}:${time}`
+    const current = (imageDesigns[selectedDate]?.disabledSlots as string[] | undefined) ?? []
+    const nextSlots = current.includes(key)
+      ? current.filter((item) => item !== key)
+      : [...current, key]
+    const nextDesigns = {
+      ...imageDesigns,
+      [selectedDate]: {
+        ...imageDesigns[selectedDate],
+        disabledSlots: nextSlots,
+      },
+    }
+
+    setError('')
+    setNotice('')
+    try {
+      const saved = await adminApi.updateManualQueueSettings({ imageDesigns: nextDesigns })
+      setImageDesigns(saved.imageDesigns ?? nextDesigns)
+      setNotice(nextSlots.includes(key) ? `ปิดรับคิว ${time} แล้ว` : `เปิดรับคิว ${time} แล้ว`)
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
 
   const updateConfig = (type: QueueType, patch: Partial<QueueConfig>) => {
     setConfigs((current) => ({
@@ -485,9 +532,21 @@ export default function AdminQueueUpdate() {
         date={selectedDate}
         textTitle={configs.text.title}
         callTitle={configs.call.title}
-        textEntries={textEntries}
-        callEntries={callEntries}
+        textEntries={textEntries.filter((entry) => !disabledSlots.includes(`text:${entry.time}`))}
+        callEntries={callEntries.filter((entry) => !disabledSlots.includes(`call:${entry.time}`))}
         showCall={showCall}
+        initialSettings={imageDesigns[selectedDate] ?? {}}
+        onSaveSettings={async (design) => {
+          const next = {
+            ...imageDesigns,
+            [selectedDate]: {
+              ...design,
+              disabledSlots: (imageDesigns[selectedDate]?.disabledSlots as string[] | undefined) ?? [],
+            },
+          }
+          const saved = await adminApi.updateManualQueueSettings({ imageDesigns: next })
+          setImageDesigns(saved.imageDesigns ?? next)
+        }}
         onBack={() => setDesignerOpen(false)}
       />
     )
@@ -602,6 +661,8 @@ export default function AdminQueueUpdate() {
             onAdd={(time, detail) => addEntry('text', time, detail)}
             onUpdate={(id, patch) => updateEntry('text', id, patch)}
             onDelete={(id) => deleteEntry('text', id)}
+            disabledTimes={disabledSlots.filter((key) => key.startsWith('text:')).map((key) => key.slice(5))}
+            onToggleTime={(time) => toggleSlot('text', time)}
           />
 
           <section className="overflow-hidden rounded-2xl border border-line bg-surface">
@@ -637,6 +698,8 @@ export default function AdminQueueUpdate() {
               onAdd={(time, detail) => addEntry('call', time, detail)}
               onUpdate={(id, patch) => updateEntry('call', id, patch)}
               onDelete={(id) => deleteEntry('call', id)}
+              disabledTimes={disabledSlots.filter((key) => key.startsWith('call:')).map((key) => key.slice(5))}
+              onToggleTime={(time) => toggleSlot('call', time)}
             />
           )}
         </>

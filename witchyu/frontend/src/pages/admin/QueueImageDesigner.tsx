@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Image as ImageIcon, Type, Palette, MoveVertical,
-  MessageCircle, Phone, Eye, EyeOff, Download, Share2,
+  MessageCircle, Phone, Eye, EyeOff, Download, Share2, Clock3,
 } from 'lucide-react'
 import { toPng } from 'html-to-image'
 
@@ -12,6 +12,29 @@ type QueueItem = {
   status: 'available' | 'full'
 }
 
+type QueueImageSettings = {
+  heading?: string
+  subtitle?: string
+  background?: string
+  useBackgroundImage?: boolean
+  textColor?: string
+  fontSize?: number
+  verticalPosition?: number
+  headingX?: number
+  subtitleX?: number
+  dateX?: number
+  showText?: boolean
+  showTimes?: boolean
+  showCallQueue?: boolean
+  aspectRatio?: string
+  iconSize?: number
+  iconX?: number
+  iconY?: number
+  backgroundZoom?: number
+  backgroundX?: number
+  backgroundY?: number
+}
+
 type Props = {
   date: string
   textTitle: string
@@ -19,6 +42,8 @@ type Props = {
   textEntries: QueueItem[]
   callEntries: QueueItem[]
   showCall: boolean
+  initialSettings: QueueImageSettings
+  onSaveSettings: (settings: Record<string, unknown>) => Promise<void>
   onBack: () => void
 }
 
@@ -38,18 +63,10 @@ export default function QueueImageDesigner({
   textEntries,
   callEntries,
   showCall,
+  initialSettings,
+  onSaveSettings,
   onBack,
 }: Props) {
-  // อ่านค่าที่บันทึกไว้ก่อนเริ่มระบบบันทึกอัตโนมัติ
-  const [initialSettings] = useState(() => {
-    try {
-      const raw = localStorage.getItem(`witchyu:queue-image-designer:${date}`)
-      return raw ? JSON.parse(raw) : {}
-    } catch {
-      console.warn('ไม่สามารถอ่านการตั้งค่าภาพคิวที่บันทึกไว้ได้')
-      return {}
-    }
-  })
 
   const [heading, setHeading] = useState(initialSettings.heading ?? 'ตารางคิววันนี้')
   const [subtitle, setSubtitle] = useState(initialSettings.subtitle ?? 'เลือกเวลาที่สะดวกได้เลย')
@@ -62,6 +79,7 @@ export default function QueueImageDesigner({
   const [subtitleX, setSubtitleX] = useState<number>(initialSettings.subtitleX ?? 0)
   const [dateX, setDateX] = useState<number>(initialSettings.dateX ?? 0)
   const [showText, setShowText] = useState<boolean>(initialSettings.showText ?? true)
+  const [showTimes, setShowTimes] = useState<boolean>(initialSettings.showTimes ?? true)
   const [showCallQueue, setShowCallQueue] = useState<boolean>(initialSettings.showCallQueue ?? showCall)
 
   const [aspectRatio, setAspectRatio] = useState(initialSettings.aspectRatio ?? '9 / 16')
@@ -73,7 +91,6 @@ export default function QueueImageDesigner({
   const [backgroundY, setBackgroundY] = useState(initialSettings.backgroundY ?? 50)
   const [draggingIcon, setDraggingIcon] = useState(false)
 
-  const storageKey = `witchyu:queue-image-designer:${date}`
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   const [saveStatus, setSaveStatus] = useState('')
@@ -137,7 +154,7 @@ export default function QueueImageDesigner({
     }
   }
 
-  const saveSettings = () => {
+  const saveSettings = async () => {
     const settings = {
       heading,
       subtitle,
@@ -150,6 +167,7 @@ export default function QueueImageDesigner({
       subtitleX,
       dateX,
       showText,
+      showTimes,
       showCallQueue,
       aspectRatio,
       iconSize,
@@ -161,9 +179,11 @@ export default function QueueImageDesigner({
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(settings))
+      setSaveStatus('กำลังบันทึก...')
+      await onSaveSettings(settings)
       setSaveStatus('บันทึกแล้ว')
-    } catch {
+    } catch (error) {
+      console.error('บันทึกการออกแบบภาพคิวไม่สำเร็จ', error)
       setSaveStatus('บันทึกไม่สำเร็จ')
     }
   }
@@ -241,7 +261,7 @@ export default function QueueImageDesigner({
                   className="font-normal leading-tight"
                   style={{ fontSize: `${Math.max(7, 17 * densityScale)}px` }}
                 >
-                  {entry.time}
+                  {showTimes && entry.time}
                 </span>
                 {entry.detail && (
                   <p
@@ -330,7 +350,7 @@ export default function QueueImageDesigner({
           <div className="mx-auto w-full max-w-[280px]">
             <div
               ref={previewRef}
-              className="relative flex w-full flex-col overflow-hidden rounded-2xl p-5 shadow-xl transition-colors"
+              className="relative flex w-full flex-col overflow-hidden rounded-none p-5 shadow-xl transition-colors"
               style={{
                 aspectRatio,
                 backgroundColor: background,
@@ -373,14 +393,11 @@ export default function QueueImageDesigner({
                     className="pointer-events-none absolute inset-0"
                     style={{
                       backgroundImage:
-                        'linear-gradient(rgba(15, 10, 25, 0.48), rgba(15, 10, 25, 0.58))',
+                        'linear-gradient(rgba(15, 10, 25, 0.12), rgba(15, 10, 25, 0.18))',
                     }}
                   />
                 </>
               )}
-              <div className="pointer-events-none absolute -right-20 -top-16 h-64 w-64 rounded-full border-[35px] border-white/5" />
-              <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full border-[35px] border-white/5" />
-
               <div
                 role="button"
                 tabIndex={0}
@@ -709,6 +726,17 @@ export default function QueueImageDesigner({
                   <MessageCircle size={17} /> แสดงคิวพิมพ์
                 </span>
                 {showText ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTimes((value) => !value)}
+                aria-pressed={showTimes}
+                className="flex h-11 items-center justify-between rounded-xl border border-line px-3 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <Clock3 size={17} /> แสดงเวลา
+                </span>
+                {showTimes ? <Eye size={18} /> : <EyeOff size={18} />}
               </button>
               <button
                 type="button"
