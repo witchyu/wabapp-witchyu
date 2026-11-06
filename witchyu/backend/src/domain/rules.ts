@@ -14,7 +14,7 @@ export interface ServiceRow {
   name: string
   price: number
   durationMin: number | null
-  unlimited: boolean
+  scheduleMode: 'shop' | 'custom'
   perQuestion: boolean
   active: boolean
   category?: { multi: boolean; active?: boolean } | null
@@ -73,7 +73,6 @@ export interface SlotRow {
   time: string
   endTime: string
   isLastSlot: boolean
-  unlimited: boolean
   active: boolean
 }
 export interface HoursRow { openTime: string; closeTime: string; isClosed: boolean }
@@ -83,7 +82,7 @@ export interface DaySlots {
   closed: boolean
   reasonCode?: 'DATE_OUT_OF_RANGE' | 'DAY_CLOSED' | 'SHOP_CLOSED'
   reason?: string
-  slots: { time: string; endTime: string; isLastSlot: boolean; unlimited: boolean; status: SlotState }[]
+  slots: { time: string; endTime: string; isLastSlot: boolean; status: SlotState }[]
 }
 
 function intervalMinutes(start: string, end: string): [number, number] {
@@ -101,23 +100,29 @@ export function computeDaySlots(a: {
   hours: HoursRow | null
   holiday: { reason: string } | null
   counts: Record<string, number>
-  unlimited: boolean
+  services: { id: string; scheduleMode: 'shop' | 'custom' }[]
+  customTimes: Record<string, string[]>
 }): DaySlots {
-  const ordered = [...a.slots].sort((x, y) => {
-    const ax = toMinutes(x.time)
-    const ay = toMinutes(y.time)
-    return ax - ay
-  })
+  const allCustom = a.services.length > 0 && a.services.every((s) => s.scheduleMode === 'custom')
+  const candidates = allCustom
+    ? (a.customTimes[a.services[0].id] ?? [])
+        .filter((time) => a.services.every((service) =>
+          service.scheduleMode !== 'custom' || (a.customTimes[service.id] ?? []).includes(time)
+        ))
+        .map((time) => ({ time, endTime: time, isLastSlot: false, active: true }))
+    : a.slots.filter((slot) => a.services.every((service) =>
+        service.scheduleMode !== 'custom' || (a.customTimes[service.id] ?? []).includes(slot.time)
+      ))
 
+  const ordered = [...candidates].sort((x, y) => toMinutes(x.time) - toMinutes(y.time))
   const allClosed = (extra: Partial<DaySlots>): DaySlots => ({
     date: a.date,
     closed: true,
     ...extra,
-    slots: ordered.map((s) => ({
-      time: s.time,
-      endTime: s.endTime,
-      isLastSlot: s.isLastSlot,
-      unlimited: s.unlimited,
+    slots: ordered.map((slot) => ({
+      time: slot.time,
+      endTime: slot.endTime,
+      isLastSlot: slot.isLastSlot,
       status: 'closed' as const,
     })),
   })
@@ -136,33 +141,18 @@ export function computeDaySlots(a: {
   return {
     date: a.date,
     closed: false,
-    slots: ordered.map((s) => {
-      const [rawStart, rawEnd] = intervalMinutes(s.time, s.endTime)
-      let start = rawStart
-      let finish = rawEnd
-
-      // สำหรับเวลาหลังเที่ยงคืนในวันทำการที่เปิดข้ามคืน
-      if (close > 1440 && start < open) {
-        start += 1440
-        finish += 1440
-      }
-
+    slots: ordered.map((slot) => {
+      const start = toMinutes(slot.time)
+      const [normalStart, normalFinish] = intervalMinutes(slot.time, slot.endTime)
       let status: SlotState
 
-      if (!s.active || finish <= start) status = 'closed'
-      else if (start < open || finish > close) status = 'closed'
+      if (!slot.active) status = 'closed'
+      else if (!allCustom && (normalFinish <= normalStart || normalStart < open || normalFinish > close)) status = 'closed'
       else if (a.date === a.now.date && start <= a.now.minutes) status = 'closed'
-      else if (a.unlimited && !s.unlimited) status = 'closed'
-      else if ((a.counts[s.time] ?? 0) > 0) status = 'full'
+      else if ((a.counts[slot.time] ?? 0) > 0) status = 'full'
       else status = 'available'
 
-      return {
-        time: s.time,
-        endTime: s.endTime,
-        isLastSlot: s.isLastSlot,
-        unlimited: s.unlimited,
-        status,
-      }
+      return { time: slot.time, endTime: slot.endTime, isLastSlot: slot.isLastSlot, status }
     }),
   }
 }

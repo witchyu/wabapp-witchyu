@@ -35,7 +35,8 @@ export interface ServiceInput {
   description: string
   price: number
   durationMin: number | null
-  unlimited: boolean
+  scheduleMode: 'shop' | 'custom'
+  customTimes?: string[]
   perQuestion: boolean
   questions: string[]
   active: boolean
@@ -51,6 +52,21 @@ function parseQuestions(v: unknown): string[] {
   return v.map((q) => str(q, 'คำถาม', 1, 200))
 }
 
+function parseScheduleMode(v: unknown): 'shop' | 'custom' {
+  if (v !== 'shop' && v !== 'custom') throw bad('รูปแบบตารางเวลาบริการไม่ถูกต้อง')
+  return v
+}
+
+function parseCustomTimes(v: unknown): string[] {
+  if (v === undefined || v === null) return []
+  if (!Array.isArray(v) || v.length > 100) throw bad('รายการเวลาบริการไม่ถูกต้อง (ไม่เกิน 100 เวลา)')
+  const times = v.map((time) => {
+    if (!isHHMM(time)) throw bad('เวลาไม่ถูกต้อง (HH:mm)')
+    return time
+  })
+  if (new Set(times).size !== times.length) throw bad('ห้ามกำหนดเวลาเดิมซ้ำกัน')
+  return times
+}
 
 export type ServiceCategoryInput = {
   id: string
@@ -125,6 +141,12 @@ export function parseServiceCategoryPatch(body: unknown): ServiceCategoryPatch {
 
 export function parseServiceCreate(body: unknown): ServiceInput {
   const o = obj(body)
+  const scheduleMode = parseScheduleMode(o.scheduleMode ?? 'shop')
+  const customTimes = parseCustomTimes(o.customTimes)
+  if (scheduleMode === 'custom' && customTimes.length === 0) {
+    throw bad('กรุณากำหนดเวลาอย่างน้อย 1 เวลา')
+  }
+
   return {
     group: parseGroup(o.group),
     categoryId: o.categoryId === undefined ? undefined : parseCategoryId(o.categoryId),
@@ -132,7 +154,8 @@ export function parseServiceCreate(body: unknown): ServiceInput {
     description: o.description == null ? '' : str(o.description, 'รายละเอียด', 0, 200),
     price: int(o.price, 'ราคา', 1, 100000),
     durationMin: o.durationMin == null ? null : int(o.durationMin, 'ระยะเวลา (นาที)', 1, 600),
-    unlimited: o.unlimited == null ? false : bool(o.unlimited, 'โทรไม่จำกัด'),
+    scheduleMode,
+    customTimes,
     perQuestion: o.perQuestion == null ? false : bool(o.perQuestion, 'คิดราคาต่อข้อ'),
     questions: o.questions == null ? [] : parseQuestions(o.questions),
     active: o.active == null ? true : bool(o.active, 'สถานะเปิดใช้งาน'),
@@ -149,7 +172,11 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
   if (o.description !== undefined) out.description = str(o.description, 'รายละเอียด', 0, 200)
   if (o.price !== undefined) out.price = int(o.price, 'ราคา', 1, 100000)
   if (o.durationMin !== undefined) out.durationMin = o.durationMin === null ? null : int(o.durationMin, 'ระยะเวลา (นาที)', 1, 600)
-  if (o.unlimited !== undefined) out.unlimited = bool(o.unlimited, 'โทรไม่จำกัด')
+  if (o.scheduleMode !== undefined) out.scheduleMode = parseScheduleMode(o.scheduleMode)
+  if (o.customTimes !== undefined) out.customTimes = parseCustomTimes(o.customTimes)
+  if (out.scheduleMode === 'custom' && out.customTimes !== undefined && out.customTimes.length === 0) {
+    throw bad('กรุณากำหนดเวลาอย่างน้อย 1 เวลา')
+  }
   if (o.perQuestion !== undefined) out.perQuestion = bool(o.perQuestion, 'คิดราคาต่อข้อ')
   if (o.questions !== undefined) out.questions = parseQuestions(o.questions)
   if (o.active !== undefined) out.active = bool(o.active, 'สถานะเปิดใช้งาน')
@@ -162,7 +189,6 @@ export function parseServicePatch(body: unknown): Partial<ServiceInput> {
 export function parseSlotCreate(body: unknown): {
   time: string
   endTime: string
-  unlimited: boolean
   active: boolean
 } {
   const o = obj(body)
@@ -176,7 +202,6 @@ export function parseSlotCreate(body: unknown): {
   return {
     time: o.time,
     endTime: o.endTime,
-    unlimited: o.unlimited == null ? false : bool(o.unlimited, 'unlimited'),
     active: o.active == null ? true : bool(o.active, 'สถานะ'),
   }
 }
@@ -184,14 +209,12 @@ export function parseSlotCreate(body: unknown): {
 export function parseSlotPatch(body: unknown): {
   time?: string
   endTime?: string
-  unlimited?: boolean
   active?: boolean
 } {
   const o = obj(body)
   const out: {
     time?: string
     endTime?: string
-    unlimited?: boolean
     active?: boolean
   } = {}
 
@@ -203,7 +226,6 @@ export function parseSlotPatch(body: unknown): {
     if (!isHHMM(o.endTime)) throw bad('รูปแบบเวลาสิ้นสุดไม่ถูกต้อง (HH:mm)')
     out.endTime = o.endTime
   }
-  if (o.unlimited !== undefined) out.unlimited = bool(o.unlimited, 'unlimited')
   if (o.active !== undefined) out.active = bool(o.active, 'สถานะ')
 
   if (out.time && out.endTime && out.time === out.endTime) {

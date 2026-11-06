@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarX } from 'lucide-react'
 import { useBooking } from '../../hooks/useBooking'
-import { selectedServices } from '../../data/services'
 import { BOOKING_DAYS } from '../../data/shop'
 import { addDays, dateShort, dayShort, toISO } from '../../utils/format'
 import { bookingApi } from '../../services/bookingApi'
@@ -18,8 +17,6 @@ type State =
 
 export default function StepDateTime() {
   const { draft, patchDraft } = useBooking()
-  const services = selectedServices(draft.serviceIds)
-  const unlimited = services.some((service) => service.unlimited)
 
   const days = useMemo(
     () => Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(), i))),
@@ -89,18 +86,6 @@ export default function StepDateTime() {
       </div>
 
       <h3 className="mb-2 mt-5 text-sm text-mute">เลือกเวลา</h3>
-
-      {unlimited && state.status === 'ready' && (
-        <p className="mb-3 rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">
-          บริการโทรไม่จำกัด เลือกได้เฉพาะรอบที่ร้านเปิดให้บริการ Unlimited
-        </p>
-      )}
-
-      {unlimited && state.status === 'ready' && !state.data.slots.some((slot) => slot.unlimited) && (
-        <p className="mb-3 rounded-xl bg-bad/10 px-3 py-2 text-sm text-bad">
-          ขณะนี้ยังไม่มีรอบเวลาที่เปิดให้บริการ Unlimited กรุณาติดต่อร้าน
-        </p>
-      )}
 
       {state.status === 'loading' && (
         <Spinner label="กำลังตรวจสอบรอบว่าง" />

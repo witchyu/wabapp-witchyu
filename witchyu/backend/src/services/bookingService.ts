@@ -99,11 +99,24 @@ export async function createBooking(clientId: string, input: CreateBookingInput)
       where: { id: { in: input.serviceIds } },
       include: { category: true },
     })
-    const sel = resolveSelection(all, input, settings.callsEnabled)
+    const sel = resolveSelection(
+      all.map((service) => ({
+        ...service,
+        scheduleMode: service.scheduleMode as 'shop' | 'custom',
+      })),
+      input,
+      settings.callsEnabled,
+    )
 
     await lockTimeSlot(tx, input.time)
 
-    const day = await loadDaySlots(tx, input.date, { unlimited: sel.services.some((s) => s.unlimited), nowMs })
+    const day = await loadDaySlots(tx, input.date, {
+      services: sel.services.map((s) => ({
+        id: s.id,
+        scheduleMode: s.scheduleMode as 'shop' | 'custom',
+      })),
+      nowMs,
+    })
     assertSlotAvailable(day, input.time)
 
     await lockBookingDate(tx, input.date)
@@ -191,12 +204,16 @@ export async function updateBooking(clientId: string, id: string, patch: UpdateB
     if (bookingTimeChanged) {
       const services = await tx.service.findMany({
         where: { id: { in: cur.serviceIds } },
+        select: { id: true, scheduleMode: true },
       })
 
       await lockTimeSlot(tx, targetTime)
 
       const day = await loadDaySlots(tx, targetDate, {
-        unlimited: services.some((s) => s.unlimited),
+        services: services.map((service) => ({
+          ...service,
+          scheduleMode: service.scheduleMode as 'shop' | 'custom',
+        })),
         nowMs,
         excludeBookingId: cur.id,
       })
@@ -276,7 +293,7 @@ async function runSettlement(): Promise<void> {
   if (due.length === 0) return
 
   const services = await prisma.service.findMany({
-    select: { id: true, durationMin: true, unlimited: true },
+    select: { id: true, durationMin: true },
   })
 
   const slotRows = await prisma.timeSlot.findMany({

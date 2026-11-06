@@ -4,7 +4,7 @@ import type { Service, ServiceGroup } from '../types'
 // สามกลุ่มแรก (เจาะจง / โทร / เป็นเรื่องๆ) เลือกได้ทีละรายการเสมอ
 export const GROUPS: { id: ServiceGroup; label: string; hint?: string; note?: string; multi: boolean }[] = [
   { id: 'question', label: 'คำถามเจาะจง', multi: false },
-  { id: 'call', label: 'คำถามแบบโทร', note: '* แพ็กเกจโทรไม่จำกัดชั่วโมง/คำถาม เลือกได้เฉพาะรอบที่ร้านเปิดให้บริการ Unlimited', multi: false },
+  { id: 'call', label: 'คำถามแบบโทร', note: '* แพ็กเกจโทรไม่จำกัดชั่วโมง/คำถาม เลือกเวลาได้ตามรอบที่ร้านเปิดให้บริการ', multi: false },
   { id: 'topic', label: 'คำถามเจาะจงเป็นเรื่องๆ', multi: false },
   { id: 'choice', label: 'คำถาม 2 ทางเลือก', multi: true },
   { id: 'love59', label: 'เซ็ตคำถามความรัก 59 บาท', multi: true },

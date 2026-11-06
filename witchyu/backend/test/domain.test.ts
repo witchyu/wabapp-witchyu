@@ -10,13 +10,13 @@ import { parseClientId, parseCreateBooking, parseCustomer, parseSlotsQuery, pars
 import { toBookingDto } from '../src/domain/dto'
 
 const svc = (id: string, group: string, price: number, extra: Partial<ServiceRow> = {}): ServiceRow => ({
-  id, group, name: id, price, durationMin: null, unlimited: false, perQuestion: false, active: true, ...extra,
+  id, group, name: id, price, durationMin: null, scheduleMode: 'shop', perQuestion: false, active: true, ...extra,
 })
 const SERVICES: ServiceRow[] = [
   svc('q-3', 'question', 79),
   svc('q-custom', 'question', 29, { perQuestion: true }),
   svc('c-30', 'call', 129, { durationMin: 30 }),
-  svc('c-unl', 'call', 299, { unlimited: true }),
+  svc('c-unl', 'call', 299),
   svc('t-money', 'topic', 149),
   svc('ch-uni', 'choice', 69),
   svc('ch-other', 'choice', 49),
@@ -28,7 +28,6 @@ const SLOTS: SlotRow[] = ['18:00', '19:00', '20:00', '21:00', '22:30'].map((time
   time,
   endTime: time === '22:30' ? '23:00' : `${String(Number(time.slice(0, 2)) + 1).padStart(2, '0')}:${time.slice(3, 5)}`,
   isLastSlot: time === '22:30',
-  unlimited: time === '20:00',
   active: true,
 }))
 const HOURS = { openTime: '18:00', closeTime: '23:00', isClosed: false }
@@ -37,7 +36,7 @@ const HOURS = { openTime: '18:00', closeTime: '23:00', isClosed: false }
 const NOW_MS = Date.parse('2026-10-04T12:30:00Z')
 const NOW = shopNow(NOW_MS)
 const day = (date: string, o: Partial<Parameters<typeof computeDaySlots>[0]> = {}) =>
-  computeDaySlots({ date, shopOpen: true, now: NOW, slots: SLOTS, hours: HOURS, holiday: null, counts: {}, unlimited: false, ...o })
+  computeDaySlots({ date, shopOpen: true, now: NOW, slots: SLOTS, hours: HOURS, holiday: null, counts: {}, services: [], customTimes: {}, ...o })
 const code = (fn: () => unknown) => {
   try { fn() } catch (e) { return e instanceof AppError ? e.code : `non-AppError:${String(e)}` }
   return null
@@ -141,23 +140,52 @@ test('computeDaySlots: today past slots closed', () => {
   assert.deepEqual(day('2026-10-05').slots.map((s) => s.status), Array(5).fill('available'))
 })
 
-test('computeDaySlots: unlimited uses its own flag, independent of Last Slot', () => {
-  const unlimitedSlots = day('2026-10-05', { unlimited: true }).slots
-  assert.deepEqual(
-    unlimitedSlots.map((x) => x.status),
-    ['closed', 'closed', 'available', 'closed', 'closed'],
-  )
+test('computeDaySlots: every service defaults to the normal shop schedule', () => {
+  const normalSlots = day('2026-10-05', {
+    services: [SERVICES.find((service) => service.id === 'c-unl')!],
+  }).slots
 
-  const normalSlots = day('2026-10-05').slots
-  assert.deepEqual(normalSlots.map((x) => x.status), Array(5).fill('available'))
+  assert.deepEqual(normalSlots.map((slot) => slot.status), Array(5).fill('available'))
+  assert.equal(normalSlots.find((slot) => slot.time === '22:30')!.isLastSlot, true)
+})
 
-  const unlimitedSlot = normalSlots.find((x) => x.time === '20:00')!
-  const lastSlot = normalSlots.find((x) => x.time === '22:30')!
+test('computeDaySlots: custom mode shows only explicit times, even outside shop hours', () => {
+  const slots = day('2026-10-05', {
+    services: [{ id: 'custom-a', scheduleMode: 'custom' }],
+    customTimes: { 'custom-a': ['23:30'] },
+  }).slots
 
-  assert.equal(unlimitedSlot.unlimited, true)
-  assert.equal(unlimitedSlot.isLastSlot, false)
-  assert.equal(lastSlot.isLastSlot, true)
-  assert.equal(lastSlot.unlimited, false)
+  assert.deepEqual(slots.map((slot) => slot.time), ['23:30'])
+  assert.deepEqual(slots.map((slot) => slot.status), ['available'])
+})
+
+test('computeDaySlots: multiple custom services use the intersection of explicit times', () => {
+  const slots = day('2026-10-05', {
+    services: [
+      { id: 'custom-a', scheduleMode: 'custom' },
+      { id: 'custom-b', scheduleMode: 'custom' },
+    ],
+    customTimes: {
+      'custom-a': ['19:00', '20:15', '21:00'],
+      'custom-b': ['20:15', '22:30'],
+    },
+  }).slots
+
+  assert.deepEqual(slots.map((slot) => slot.time), ['20:15'])
+  assert.deepEqual(slots.map((slot) => slot.status), ['available'])
+})
+
+test('computeDaySlots: mixed shop and custom services use their time intersection', () => {
+  const slots = day('2026-10-05', {
+    services: [
+      { id: 'normal-a', scheduleMode: 'shop' },
+      { id: 'custom-a', scheduleMode: 'custom' },
+    ],
+    customTimes: { 'custom-a': ['20:00', '23:30'] },
+  }).slots
+
+  assert.deepEqual(slots.map((slot) => slot.time), ['20:00'])
+  assert.deepEqual(slots.map((slot) => slot.status), ['available'])
 })
 
 test('computeDaySlots: one active booking makes a slot full', () => {

@@ -45,14 +45,12 @@ test('booking concurrency: one booking per slot and admin slot protection', asyn
         update: {
           endTime: time === '23:00' ? '23:30' : '23:59',
           isLastSlot: false,
-          unlimited: false,
           active: true,
         },
         create: {
           time,
           endTime: time === '23:00' ? '23:30' : '23:59',
           isLastSlot: false,
-          unlimited: false,
           active: true,
         },
       })
@@ -66,7 +64,6 @@ test('booking concurrency: one booking per slot and admin slot protection', asyn
         description: 'Temporary integration test service',
         price: 29,
         durationMin: null,
-        unlimited: false,
         perQuestion: false,
         questions: [],
         active: true,
@@ -235,7 +232,6 @@ test('booking concurrency: one booking per slot and admin slot protection', asyn
             time: old.time,
             endTime: old.endTime,
             isLastSlot: old.isLastSlot,
-            unlimited: old.unlimited,
             active: old.active,
           },
         })

@@ -56,7 +56,7 @@ function parseTime(v: unknown): string {
 }
 
 export function parseServiceIds(v: unknown): string[] {
-  if (!Array.isArray(v) || v.length < 1 || v.length > 10 || v.some((x) => typeof x !== 'string' || !x || x.length > 40)) {
+  if (!Array.isArray(v) || v.length < 1 || v.some((x) => typeof x !== 'string' || !x || x.length > 40)) {
     throw bad('VALIDATION_SERVICE', 'กรุณาเลือกบริการอย่างน้อย 1 รายการ')
   }
   const ids = v as string[]
@@ -105,6 +105,6 @@ export function parseClientId(v: unknown): string {
 export function parseSlotsQuery(q: Record<string, unknown>): { date: string; serviceIds: string[] } {
   const date = parseDate(q.date)
   const raw = typeof q.serviceIds === 'string' && q.serviceIds ? q.serviceIds.split(',') : []
-  if (raw.length > 10 || raw.some((x) => !x || x.length > 40)) throw bad('VALIDATION_SERVICE', 'รายการบริการไม่ถูกต้อง')
+  if (raw.some((x) => !x || x.length > 40)) throw bad('VALIDATION_SERVICE', 'รายการบริการไม่ถูกต้อง')
   return { date, serviceIds: raw }
 }

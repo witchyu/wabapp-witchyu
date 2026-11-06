@@ -151,13 +151,17 @@ export async function deleteBooking(id: string) {
 export async function listServices() {
   const rows = await prisma.service.findMany({
     orderBy: { sortOrder: 'asc' },
-    include: { category: true },
+    include: {
+      category: true,
+      serviceTimes: { where: { active: true }, orderBy: { time: 'asc' } },
+    },
   })
   return rows.map(toAdminServiceDto)
 }
 
 export async function createService(input: ServiceInput) {
   const categoryId = input.categoryId ?? input.group
+  const { customTimes = [], ...serviceInput } = input
 
   const category = await prisma.serviceCategory.findUnique({
     where: { id: categoryId },
@@ -173,11 +177,17 @@ export async function createService(input: ServiceInput) {
   const row = await prisma.service.create({
     data: {
       id: `svc-${randomBytes(4).toString('hex')}`,
-      ...input,
+      ...serviceInput,
       categoryId,
       sortOrder: (last._max.sortOrder ?? 0) + 1,
+      serviceTimes: {
+        create: customTimes.map((time) => ({ time })),
+      },
     },
-    include: { category: true },
+    include: {
+      category: true,
+      serviceTimes: { where: { active: true }, orderBy: { time: 'asc' } },
+    },
   })
 
   return toAdminServiceDto(row)
@@ -196,13 +206,34 @@ export async function updateService(id: string, patch: Partial<ServiceInput>) {
       }
     }
 
-    const row = await prisma.service.update({
-      where: { id },
-      data: patch,
-      include: { category: true },
-    })
+    const { customTimes, ...servicePatch } = patch
 
-    return toAdminServiceDto(row)
+    return await prisma.$transaction(async (tx) => {
+      await tx.service.update({
+        where: { id },
+        data: servicePatch,
+      })
+
+      if (customTimes !== undefined) {
+        await tx.serviceTime.deleteMany({ where: { serviceId: id } })
+
+        if (customTimes.length > 0) {
+          await tx.serviceTime.createMany({
+            data: customTimes.map((time) => ({ serviceId: id, time })),
+          })
+        }
+      }
+
+      const row = await tx.service.findUniqueOrThrow({
+        where: { id },
+        include: {
+          category: true,
+          serviceTimes: { where: { active: true }, orderBy: { time: 'asc' } },
+        },
+      })
+
+      return toAdminServiceDto(row)
+    })
   } catch (e) {
     if (isCode(e, 'P2025')) throw notFound('บริการ')
     throw e
@@ -301,7 +332,6 @@ export const listSlots = () => prisma.timeSlot.findMany({ orderBy: { time: 'asc'
 export async function createSlot(input: {
   time: string
   endTime: string
-  unlimited: boolean
   active: boolean
 }) {
   try {
@@ -341,7 +371,6 @@ export async function updateSlot(
   patch: {
     time?: string
     endTime?: string
-    unlimited?: boolean
     active?: boolean
   },
 ) {

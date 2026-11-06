@@ -170,8 +170,8 @@ export const adminApi = {
   deleteService: (id: string) => guard(() => api.del<{ ok: true }>(`${A}/services/${encodeURIComponent(id)}`, auth())),
 
   slots: () => guard(() => api.get<{ slots: AdminSlot[] }>(`${A}/time-slots`, auth())).then((r) => r.slots),
-  createSlot: (s: { time: string; endTime: string; unlimited: boolean; active?: boolean }) => guard(() => api.post<{ slot: AdminSlot }>(`${A}/time-slots`, s, auth())).then((r) => r.slot),
-  updateSlot: (id: number, s: { time?: string; endTime?: string; unlimited?: boolean; active?: boolean }) =>
+  createSlot: (s: { time: string; endTime: string; active?: boolean }) => guard(() => api.post<{ slot: AdminSlot }>(`${A}/time-slots`, s, auth())).then((r) => r.slot),
+  updateSlot: (id: number, s: { time?: string; endTime?: string; active?: boolean }) =>
     guard(() => api.patch<{ slot: AdminSlot }>(`${A}/time-slots/${id}`, s, auth())).then((r) => r.slot),
   deleteSlot: (id: number) => guard(() => api.del<{ ok: true }>(`${A}/time-slots/${id}`, auth())),
 

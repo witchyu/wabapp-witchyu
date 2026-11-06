@@ -58,7 +58,8 @@ export interface ServiceRowLike {
   description: string
   price: number
   durationMin: number | null
-  unlimited: boolean
+  scheduleMode: string
+  serviceTimes?: { time: string }[]
   perQuestion: boolean
   questions: string[]
   active: boolean
@@ -83,7 +84,6 @@ export function toServiceDto(s: ServiceRowLike) {
     desc: s.description,
     price: s.price,
     durationMin: s.durationMin ?? undefined,
-    unlimited: s.unlimited || undefined,
     perQuestion: s.perQuestion || undefined,
     questions: s.questions.length ? s.questions : undefined,
     active: s.active,
@@ -114,7 +114,8 @@ export function toAdminServiceDto(s: AdminServiceRowLike) {
     desc: s.description,
     price: s.price,
     durationMin: s.durationMin,
-    unlimited: s.unlimited,
+    scheduleMode: s.scheduleMode,
+    customTimes: (s.serviceTimes ?? []).map((item) => item.time).sort(),
     perQuestion: s.perQuestion,
     questions: s.questions,
     active: s.active,

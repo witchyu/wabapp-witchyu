@@ -12,12 +12,10 @@ import type { AdminSlot } from '../../types/admin'
 type SlotForm = {
   time: string
   endTime: string
-  unlimited: boolean
 }
 const emptyForm: SlotForm = {
   time: '',
   endTime: '',
-  unlimited: false,
 }
 
 const validTime = (value: string) =>
@@ -87,7 +85,6 @@ export default function AdminSlots() {
     setEditForm({
       time: slot.time,
       endTime: slot.endTime,
-      unlimited: slot.unlimited,
     })
   }
 
@@ -184,17 +181,6 @@ export default function AdminSlots() {
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.unlimited}
-              onChange={(e) => updateForm('unlimited', e.target.checked)}
-              className="h-4 w-4 accent-primary"
-            />
-            เปิดให้บริการแพ็กเกจ Unlimited
-          </label>
-        </div>
       </section>
 
       <section>
@@ -236,17 +222,6 @@ export default function AdminSlots() {
                     </label>
                   </div>
 
-                  <div className="flex flex-wrap gap-x-6 gap-y-3">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editForm.unlimited}
-                        onChange={(e) => updateEditForm('unlimited', e.target.checked)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                      เปิดให้บริการแพ็กเกจ Unlimited
-                    </label>
-                  </div>
 
                   <div className="flex gap-2">
                     <button
@@ -276,11 +251,6 @@ export default function AdminSlots() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {slot.unlimited && (
-                        <span className="rounded-full bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-400">
-                          Unlimited
-                        </span>
-                      )}
                     </div>
                   </div>
 

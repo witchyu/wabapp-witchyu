@@ -20,7 +20,9 @@ interface Form {
   desc: string
   price: string
   durationMin: string
-  unlimited: boolean
+  scheduleMode: 'shop' | 'custom'
+  customTimes: string[]
+  newCustomTime: string
   perQuestion: boolean
   questionsText: string
   active: boolean
@@ -35,7 +37,9 @@ const blank = (categoryId = 'question', group: ServiceGroup = 'question'): Form 
   desc: '',
   price: '',
   durationMin: '',
-  unlimited: false,
+  scheduleMode: 'shop',
+  customTimes: [],
+  newCustomTime: '',
   perQuestion: false,
   questionsText: '',
   active: true,
@@ -50,7 +54,9 @@ const fromService = (s: AdminService): Form => ({
   desc: s.desc,
   price: String(s.price),
   durationMin: s.durationMin ? String(s.durationMin) : '',
-  unlimited: s.unlimited,
+  scheduleMode: s.scheduleMode ?? 'shop',
+  customTimes: s.customTimes ?? [],
+  newCustomTime: '',
   perQuestion: s.perQuestion,
   questionsText: s.questions.join('\n'),
   active: s.active,
@@ -126,6 +132,17 @@ export default function AdminServices() {
     if (!Number.isInteger(price) || price < 1) return toast('กรุณากรอกราคาเป็นจำนวนเต็มบาท', 'error')
     const duration = form.durationMin.trim() === '' ? null : Number(form.durationMin)
     if (duration !== null && (!Number.isInteger(duration) || duration < 1)) return toast('ระยะเวลาต้องเป็นจำนวนนาทีเต็ม', 'error')
+    if (form.scheduleMode === 'custom') {
+      if (form.customTimes.length === 0) {
+        return toast('กรุณาเพิ่มเวลาอย่างน้อย 1 เวลา', 'error')
+      }
+      if (form.customTimes.some((time) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))) {
+        return toast('พบรายการเวลาที่ไม่ถูกต้อง', 'error')
+      }
+      if (new Set(form.customTimes).size !== form.customTimes.length) {
+        return toast('ห้ามกำหนดเวลาเดิมซ้ำกัน', 'error')
+      }
+    }
     if (!form.categoryId) {
       return toast('กรุณาเลือกหมวดหมู่บริการ', 'error')
     }
@@ -142,7 +159,8 @@ export default function AdminServices() {
       desc: form.desc.trim(),
       price,
       durationMin: duration,
-      unlimited: form.unlimited,
+      scheduleMode: form.scheduleMode,
+      customTimes: form.scheduleMode === 'custom' ? form.customTimes : [],
       perQuestion: form.perQuestion,
       questions: form.questionsText.split('\n').map((q) => q.trim()).filter(Boolean),
       active: form.active,
@@ -211,7 +229,7 @@ export default function AdminServices() {
                   <li key={s.id} className={`flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 ${s.active ? '' : 'opacity-60'}`}>
                     <div className="min-w-0 flex-1">
                       <div className="break-words font-medium">{s.name}{s.recommended && <span className="ml-2 rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">แนะนำ</span>}</div>
-                      <div className="text-sm text-gold">{s.price} บาท{s.perQuestion ? '/ข้อ' : ''}{s.durationMin ? ` · ${s.durationMin} นาที` : ''}{s.unlimited ? ' · โทรไม่จำกัด' : ''}</div>
+                      <div className="text-sm text-gold">{s.price} บาท{s.perQuestion ? '/ข้อ' : ''}{s.durationMin ? ` · ${s.durationMin} นาที` : ''}</div>
                     </div>
                     <Toggle label={`เปิดใช้งาน ${s.name}`} checked={s.active} onChange={(v) => toggleActive(s, v)} />
                     <button aria-label={`แก้ไข ${s.name}`} onClick={() => setForm(fromService(s))} className="grid h-11 w-11 place-items-center rounded-xl bg-raised"><Pencil size={18} /></button>
@@ -268,9 +286,79 @@ export default function AdminServices() {
             <label className="grid gap-1.5">คำถามในเซ็ต (บรรทัดละ 1 ข้อ ไม่บังคับ)
               <textarea rows={5} className="w-full resize-none rounded-xl border border-line bg-night p-3 text-ink focus:border-gold focus:outline-none" value={form.questionsText} onChange={(e) => set({ questionsText: e.target.value })} />
             </label>
+            <label className="grid gap-1.5">
+              รูปแบบเวลาที่จองได้
+              <select
+                className={input}
+                value={form.scheduleMode}
+                onChange={(e) => set({ scheduleMode: e.target.value as Form['scheduleMode'] })}
+              >
+                <option value="shop">ตามรอบเวลาปกติของร้าน</option>
+                <option value="custom">กำหนดเวลาเป็นรายการเอง</option>
+              </select>
+            </label>
+            {form.scheduleMode === 'custom' && (
+              <div className="grid gap-3 rounded-xl bg-night/60 p-3">
+                <div className="flex items-end gap-2">
+                  <label className="grid flex-1 gap-1.5">
+                    เพิ่มเวลานัดหมาย
+                    <input
+                      type="time"
+                      className={input}
+                      value={form.newCustomTime}
+                      onChange={(e) => set({ newCustomTime: e.target.value })}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="h-12 rounded-xl bg-gold px-4 font-semibold text-night"
+                    onClick={() => {
+                      const time = form.newCustomTime
+                      if (!time) return toast('กรุณาเลือกเวลา', 'error')
+                      if (form.customTimes.includes(time)) return toast('มีเวลานี้แล้ว', 'error')
+                      set({
+                        customTimes: [...form.customTimes, time].sort(),
+                        newCustomTime: '',
+                      })
+                    }}
+                  >
+                    เพิ่มเวลา
+                  </button>
+                </div>
+                {form.customTimes.length === 0 ? (
+                  <p className="text-xs text-mute">ยังไม่มีเวลานัดหมาย</p>
+                ) : (
+                  <ul className="grid gap-2">
+                    {form.customTimes.map((time, index) => (
+                      <li key={`${time}-${index}`} className="flex items-center gap-2">
+                        <input
+                          aria-label={`เวลา ${index + 1}`}
+                          type="time"
+                          className={input}
+                          value={time}
+                          onChange={(e) => {
+                            const next = [...form.customTimes]
+                            next[index] = e.target.value
+                            set({ customTimes: next })
+                          }}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`ลบเวลา ${time}`}
+                          className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-bad/15 text-bad"
+                          onClick={() => set({ customTimes: form.customTimes.filter((_, i) => i !== index) })}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-mute">หนึ่งเวลาเปิดรับจองได้หนึ่งคน และใช้กับทุกวันที่ร้านเปิด</p>
+              </div>
+            )}
             {([
               ['perQuestion', 'คิดราคาต่อข้อ (ลูกค้าระบุจำนวนคำถามเอง)'],
-              ['unlimited', 'จองได้เฉพาะรอบเวลาที่กำหนด'],
               ['active', 'เปิดให้ลูกค้าเห็นและจอง'],
               ['recommended', '⭐ แนะนำบนหน้าแรก'],
             ] as const).map(([k, label]) => (

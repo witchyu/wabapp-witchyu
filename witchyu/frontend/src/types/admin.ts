@@ -32,7 +32,8 @@ export interface AdminService {
   desc: string
   price: number
   durationMin: number | null
-  unlimited: boolean
+  scheduleMode: 'shop' | 'custom'
+  customTimes: string[]
   perQuestion: boolean
   questions: string[]
   active: boolean
@@ -49,7 +50,6 @@ export interface AdminSlot {
   time: string
   endTime: string
   isLastSlot: boolean
-  unlimited: boolean
   active: boolean
 }
 export interface AdminHours { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }

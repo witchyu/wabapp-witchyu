@@ -9,7 +9,6 @@ export interface SeedService {
   desc: string
   price: number
   durationMin?: number
-  unlimited?: boolean
   perQuestion?: boolean
   questions?: string[]
   active: boolean
@@ -31,7 +30,7 @@ export const SERVICES: SeedService[] = [
   s('c-15', 'call', 'โทร 15 นาที', 'คุยสายกับหมอดู 15 นาที', 99, { durationMin: 15 }),
   s('c-30', 'call', 'โทร 30 นาที', 'คุยสายกับหมอดู 30 นาที', 129, { durationMin: 30 }),
   s('c-60', 'call', 'โทร 1 ชั่วโมง', 'คุยสายกับหมอดู 1 ชั่วโมง', 239, { durationMin: 60 }),
-  s('c-unl', 'call', 'โทรไม่จำกัดชั่วโมง/คำถาม', 'จองได้เฉพาะรอบ 22:30 น.', 299, { unlimited: true }),
+  s('c-unl', 'call', 'โทรไม่จำกัดชั่วโมง/คำถาม', '', 299),
 
   s('t-health', 'topic', 'สุขภาพ', 'ภาพรวมเรื่องสุขภาพ', 129),
   s('t-money', 'topic', 'การเงิน', 'ภาพรวมเรื่องการเงิน', 149),

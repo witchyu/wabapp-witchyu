@@ -75,22 +75,35 @@ model ServiceCategory {
 }
 
 model Service {
-  id          String           @id // เช่น q-3, c-30 (ใช้เป็นรหัสเดียวกับหน้าเว็บ)
-  group       ServiceGroup
-  categoryId  String?
-  category    ServiceCategory? @relation(fields: [categoryId], references: [id])
-  name        String
-  description String           @default("")
-  price       Int // บาท (ต่อข้อ ถ้า perQuestion = true)
-  durationMin Int?
-  unlimited   Boolean          @default(false) // จองได้เฉพาะรอบ 22:30
-  perQuestion Boolean          @default(false)
-  questions   String[]
-  active      Boolean          @default(true)
-  recommended Boolean          @default(false)
-  sortOrder   Int              @default(0)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id           String           @id // เช่น q-3, c-30 (ใช้เป็นรหัสเดียวกับหน้าเว็บ)
+  group        ServiceGroup
+  categoryId   String?
+  category     ServiceCategory? @relation(fields: [categoryId], references: [id])
+  name         String
+  description  String           @default("")
+  price        Int // บาท (ต่อข้อ ถ้า perQuestion = true)
+  durationMin  Int?
+  scheduleMode String           @default("shop") // shop | custom
+  perQuestion  Boolean          @default(false)
+  questions    String[]
+  active       Boolean          @default(true)
+  recommended  Boolean          @default(false)
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  serviceTimes ServiceTime[]
+}
+
+model ServiceTime {
+  id        String   @id @default(cuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  time      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([serviceId, time])
+  @@index([serviceId, active])
 }
 
 // รอบเวลา: หนึ่งคนต่อหนึ่งช่วงเวลา
@@ -99,7 +112,6 @@ model TimeSlot {
   time       String  @unique
   endTime    String
   isLastSlot Boolean @default(false)
-  unlimited  Boolean @default(false)
   active     Boolean @default(true)
 }
 

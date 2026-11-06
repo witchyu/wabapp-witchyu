@@ -16,7 +16,6 @@ async function main() {
         description: s.desc,
         price: s.price,
         durationMin: s.durationMin ?? null,
-        unlimited: s.unlimited ?? false,
         perQuestion: s.perQuestion ?? false,
         questions: s.questions ?? [],
         active: s.active,
@@ -25,8 +24,20 @@ async function main() {
     })
   }
 
-  for (const time of ['18:00', '19:00', '20:00', '21:00', '22:30']) {
-    await prisma.timeSlot.upsert({ where: { time }, update: {}, create: { time, capacity: 1 } })
+  const timeSlots = [
+    { time: '18:00', endTime: '19:00' },
+    { time: '19:00', endTime: '20:00' },
+    { time: '20:00', endTime: '21:00' },
+    { time: '21:00', endTime: '22:00' },
+    { time: '22:30', endTime: '23:00', isLastSlot: true },
+  ]
+
+  for (const slot of timeSlots) {
+    await prisma.timeSlot.upsert({
+      where: { time: slot.time },
+      update: {},
+      create: slot,
+    })
   }
 
   for (let dayOfWeek = 0; dayOfWeek <= 6; dayOfWeek++) {

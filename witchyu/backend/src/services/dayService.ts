@@ -8,10 +8,27 @@ import { readSettings } from './shopService'
 export async function loadDaySlots(
   db: Db,
   date: string,
-  opts: { unlimited: boolean; nowMs: number; excludeBookingId?: string },
+  opts: {
+    services: { id: string; scheduleMode: 'shop' | 'custom' }[]
+    nowMs: number
+    excludeBookingId?: string
+  },
 ): Promise<DaySlots> {
   const settings = await readSettings(db)
   const slots = await db.timeSlot.findMany()
+  const customRows = opts.services.some((service) => service.scheduleMode === 'custom')
+    ? await db.serviceTime.findMany({
+        where: {
+          serviceId: { in: opts.services.filter((service) => service.scheduleMode === 'custom').map((service) => service.id) },
+          active: true,
+        },
+        select: { serviceId: true, time: true },
+      })
+    : []
+  const customTimes: Record<string, string[]> = {}
+  for (const row of customRows) {
+    ;(customTimes[row.serviceId] ??= []).push(row.time)
+  }
   const holiday = await db.holiday.findUnique({ where: { date } })
   const hours = await db.businessHours.findUnique({ where: { dayOfWeek: dayOfWeek(date) } })
   // ถือรอบไว้: ยืนยันแล้ว หรือรอชำระเงินที่ยังไม่หมดเวลา
@@ -33,10 +50,11 @@ export async function loadDaySlots(
     date,
     shopOpen: settings.shopOpen,
     now: shopNow(opts.nowMs),
-    slots: slots.map((s) => ({ time: s.time, endTime: s.endTime, isLastSlot: s.isLastSlot, unlimited: s.unlimited, active: s.active })) ,
+    slots: slots.map((s) => ({ time: s.time, endTime: s.endTime, isLastSlot: s.isLastSlot, active: s.active })),
     hours: hours ? { openTime: hours.openTime, closeTime: hours.closeTime, isClosed: hours.isClosed } : null,
     holiday: holiday ? { reason: holiday.reason } : null,
     counts,
-    unlimited: opts.unlimited,
+    services: opts.services,
+    customTimes,
   })
 }

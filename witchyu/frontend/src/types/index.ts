@@ -17,7 +17,10 @@ export interface Service {
   desc: string
   price: number            // บาท (ต่อคำถาม ถ้า perQuestion = true)
   durationMin?: number
-  unlimited?: boolean      // เลือกได้เฉพาะรอบที่เปิด Unlimited
+  scheduleMode?: 'shop' | 'custom_window'
+  scheduleStartTime?: string | null
+  scheduleEndTime?: string | null
+  unlimited?: boolean      // legacy ระหว่างเปลี่ยนผ่าน
   perQuestion?: boolean    // บริการ "จำนวนคำถามกำหนดเอง"
   questions?: string[]     // รายการคำถามในเซ็ต (แสดงใน "ดูรายละเอียด")
   active: boolean          // Phase 4: Admin เปิด/ปิดได้
@@ -70,5 +73,5 @@ export interface DaySlots {
   date: string
   closed: boolean         // ทั้งวันปิดรับ (วันหยุด/นอกช่วง 7 วัน)
   reason?: string
-  slots: { time: string; endTime: string; isLastSlot: boolean; unlimited: boolean; status: SlotStatus }[]
+  slots: { time: string; endTime: string; isLastSlot: boolean; status: SlotStatus }[]
 }

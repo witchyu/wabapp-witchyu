@@ -88,9 +88,9 @@ test('computeOpenNow', () => {
 test('shop switch closes every slot (SHOP_CLOSED)', () => {
   const now = shopNow(Date.parse('2026-10-04T05:00:00Z')) // 12:00 ไทย
   const day = computeDaySlots({
-    date: '2026-10-05', shopOpen: false, now, unlimited: false, holiday: null, counts: {},
+    date: '2026-10-05', shopOpen: false, now, holiday: null, counts: {}, services: [], customTimes: {},
     hours: { openTime: '18:00', closeTime: '23:00', isClosed: false },
-    slots: [{ time: '19:00', endTime: '20:00', isLastSlot: false, unlimited: false, active: true }],
+    slots: [{ time: '19:00', endTime: '20:00', isLastSlot: false, active: true }],
   })
   assert.equal(day.closed, true); assert.equal(day.reasonCode, 'SHOP_CLOSED')
   assert.equal(code(() => assertSlotAvailable(day, '19:00')), 'SHOP_CLOSED')
@@ -106,7 +106,7 @@ test('parseLogin', () => {
 
 test('parseServiceCreate / parseServicePatch', () => {
   const ok = parseServiceCreate({ group: 'topic', name: ' สุขภาพ ', price: '129' })
-  assert.deepEqual(ok, { group: 'topic', categoryId: undefined, name: 'สุขภาพ', description: '', price: 129, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false })
+  assert.deepEqual(ok, { group: 'topic', categoryId: undefined, name: 'สุขภาพ', description: '', price: 129, durationMin: null, scheduleMode: 'shop', customTimes: [], perQuestion: false, questions: [], active: true, recommended: false })
   assert.equal(code(() => parseServiceCreate({ group: 'nope', name: 'a', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: '', price: 1 })), 'VALIDATION')
   assert.equal(code(() => parseServiceCreate({ group: 'call', name: 'a', price: 0 })), 'VALIDATION')
@@ -127,7 +127,6 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
     {
       time: '20:30',
       endTime: '21:00',
-      unlimited: false,
       active: true,
     },
   )
@@ -136,22 +135,19 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
       time: '22:00',
       endTime: '23:00',
       isLastSlot: true,
-      unlimited: true,
       active: false,
     }),
     {
       time: '22:00',
       endTime: '23:00',
-      unlimited: true,
       active: false,
     },
   )
   assert.equal(code(() => parseSlotCreate({ time: '25:00', endTime: '26:00' })), 'VALIDATION')
   assert.equal(code(() => parseSlotCreate({ time: '20:00', endTime: '20:00' })), 'VALIDATION')
   assert.equal(code(() => parseSlotCreate({ time: '20:00' })), 'VALIDATION')
-  assert.deepEqual(parseSlotPatch({ unlimited: true }), { unlimited: true })
+  assert.equal(code(() => parseSlotPatch({ unlimited: true })), 'VALIDATION')
   assert.deepEqual(parseSlotPatch({ isLastSlot: true, active: false }), { active: false })
-  assert.equal(code(() => parseSlotPatch({ unlimited: 'yes' })), 'VALIDATION')
   assert.equal(code(() => parseSlotPatch({ time: '25:00' })), 'VALIDATION')
   assert.equal(code(() => parseSlotPatch({ time: '10:00', endTime: '10:00' })), 'VALIDATION')
 
@@ -177,6 +173,6 @@ test('slots / hours / holiday / settings / bookings query validation', () => {
 })
 
 test('toAdminServiceDto keeps explicit false/empty values', () => {
-  const dto = toAdminServiceDto({ id: 'a', group: 'call', name: 'n', description: '', price: 5, durationMin: null, unlimited: false, perQuestion: false, questions: [], active: true, recommended: false, sortOrder: 3 })
-  assert.equal(dto.unlimited, false); assert.equal(dto.durationMin, null); assert.deepEqual(dto.questions, []); assert.equal(dto.sortOrder, 3)
+  const dto = toAdminServiceDto({ id: 'a', group: 'call', name: 'n', description: '', price: 5, durationMin: null, scheduleMode: 'shop', serviceTimes: [], perQuestion: false, questions: [], active: true, recommended: false, sortOrder: 3 })
+  assert.equal(dto.scheduleMode, 'shop'); assert.deepEqual(dto.customTimes, []); assert.equal(dto.durationMin, null); assert.deepEqual(dto.questions, []); assert.equal(dto.sortOrder, 3)
 })
