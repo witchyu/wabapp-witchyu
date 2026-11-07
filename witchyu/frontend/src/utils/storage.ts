@@ -1,4 +1,4 @@
-import { BOOKING_DAYS } from '../data/shop'
+import { SHOP } from '../data/shop'
 import { getServices } from '../data/services'
 import type { CustomerInfo, Draft } from '../types'
 import { addDays, toISO } from './format'
@@ -83,7 +83,7 @@ export function sanitizeDraft(raw: unknown, fallbackCustomer: CustomerInfo, now:
   const known = new Set(getServices().filter((s) => s.active).map((s) => s.id))
   const ids = Array.isArray(o.serviceIds) ? [...new Set(o.serviceIds.filter((x): x is string => typeof x === 'string' && known.has(x)))] : []
   const multi = o.multi === true
-  const validDates = Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(now), i)))
+  const validDates = Array.from({ length: SHOP.bookingDays }, (_, i) => toISO(addDays(new Date(now), i)))
   const date = typeof o.date === 'string' && validDates.includes(o.date) ? o.date : base.date
   const qc = Number(o.questionCount)
   const remember = o.remember !== false

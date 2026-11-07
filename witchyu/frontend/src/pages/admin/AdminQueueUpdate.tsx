@@ -535,14 +535,11 @@ export default function AdminQueueUpdate() {
         textEntries={textEntries.filter((entry) => !disabledSlots.includes(`text:${entry.time}`))}
         callEntries={callEntries.filter((entry) => !disabledSlots.includes(`call:${entry.time}`))}
         showCall={showCall}
-        initialSettings={imageDesigns[selectedDate] ?? {}}
+        initialSettings={{ ...imageDesigns.default, ...imageDesigns[selectedDate] }}
         onSaveSettings={async (design) => {
           const next = {
             ...imageDesigns,
-            [selectedDate]: {
-              ...design,
-              disabledSlots: (imageDesigns[selectedDate]?.disabledSlots as string[] | undefined) ?? [],
-            },
+            default: design,
           }
           const saved = await adminApi.updateManualQueueSettings({ imageDesigns: next })
           setImageDesigns(saved.imageDesigns ?? next)

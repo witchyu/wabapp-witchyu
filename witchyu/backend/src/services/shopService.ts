@@ -5,6 +5,7 @@ import { dayOfWeek, shopNow } from '../domain/time'
 export interface Settings {
   shopOpen: boolean
   callsEnabled: boolean
+  bookingDays: number
   customerDataRetentionDays: number
   bookingRetentionDays: number
   chatRetentionDays: number
@@ -18,6 +19,7 @@ export async function readSettings(db: Db): Promise<Settings> {
   return {
     shopOpen: row?.shopOpen ?? true,
     callsEnabled: row?.callsEnabled ?? true,
+    bookingDays: row?.bookingDays ?? 7,
     customerDataRetentionDays: row?.customerDataRetentionDays ?? 30,
     bookingRetentionDays: row?.bookingRetentionDays ?? 30,
     chatRetentionDays: row?.chatRetentionDays ?? 10,
@@ -41,6 +43,7 @@ export async function getPublicShop() {
   return {
     isOpen: settings.shopOpen,
     callsEnabled: settings.callsEnabled,
+    bookingDays: settings.bookingDays,
     openNow: computeOpenNow({ shopOpen: settings.shopOpen, now, hoursToday, holidayToday: !!holiday }),
     hoursLabel: formatHoursLabel(hours),
   }

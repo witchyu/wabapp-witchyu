@@ -49,6 +49,7 @@ export async function loadDaySlots(
   return computeDaySlots({
     date,
     shopOpen: settings.shopOpen,
+    bookingDays: settings.bookingDays,
     now: shopNow(opts.nowMs),
     slots: slots.map((s) => ({ time: s.time, endTime: s.endTime, isLastSlot: s.isLastSlot, active: s.active })),
     hours: hours ? { openTime: hours.openTime, closeTime: hours.closeTime, isClosed: hours.isClosed } : null,

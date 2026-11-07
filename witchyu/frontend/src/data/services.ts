@@ -45,7 +45,7 @@ export function serviceCategoryOptions(services: Service[]): ServiceGroupOption[
       id,
       label: category?.label ?? legacy?.label ?? id,
       hint: category?.hint || legacy?.hint,
-      note: category?.note || legacy?.note,
+      note: category ? category.note : legacy?.note,
       multi: category?.multi ?? legacy?.multi ?? false,
     })
   }

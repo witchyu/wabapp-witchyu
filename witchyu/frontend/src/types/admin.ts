@@ -57,6 +57,7 @@ export interface AdminHoliday { id: number; date: string; reason: string }
 export interface AdminSettings {
   shopOpen: boolean
   callsEnabled: boolean
+  bookingDays: number
   customerDataRetentionDays: number
   bookingRetentionDays: number
   chatRetentionDays: number

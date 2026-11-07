@@ -231,6 +231,7 @@ model ShopSetting {
   id                        Int      @id @default(1)
   shopOpen                  Boolean  @default(true)
   callsEnabled              Boolean  @default(true)
+  bookingDays               Int      @default(7)
   customerDataRetentionDays Int      @default(30)
   bookingRetentionDays      Int      @default(30)
   chatRetentionDays         Int      @default(10)

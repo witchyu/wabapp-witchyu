@@ -267,6 +267,7 @@ export function parseHolidayCreate(body: unknown): { date: string; reason: strin
 export function parseSettingsPatch(body: unknown): {
   shopOpen?: boolean
   callsEnabled?: boolean
+  bookingDays?: number
   customerDataRetentionDays?: number
   bookingRetentionDays?: number
   chatRetentionDays?: number
@@ -277,6 +278,7 @@ export function parseSettingsPatch(body: unknown): {
   const out: {
     shopOpen?: boolean
     callsEnabled?: boolean
+    bookingDays?: number
     customerDataRetentionDays?: number
     bookingRetentionDays?: number
     chatRetentionDays?: number
@@ -286,6 +288,7 @@ export function parseSettingsPatch(body: unknown): {
 
   if (o.shopOpen !== undefined) out.shopOpen = bool(o.shopOpen, 'สถานะร้าน')
   if (o.callsEnabled !== undefined) out.callsEnabled = bool(o.callsEnabled, 'สถานะรับจองโทร')
+  if (o.bookingDays !== undefined) out.bookingDays = int(o.bookingDays, 'จำนวนวันเปิดจองล่วงหน้า', 1, 7)
 
   const retentionFields = [
     ['customerDataRetentionDays', 'ระยะเวลาเก็บข้อมูลลูกค้า'],

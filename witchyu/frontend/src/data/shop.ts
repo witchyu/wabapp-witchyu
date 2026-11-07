@@ -4,13 +4,13 @@ export const SHOP = {
   name: 'Witchyu',
   isOpen: true,        // สวิตช์เปิดรับจองคิว (ปิด = จองไม่ได้)
   callsEnabled: true,  // สวิตช์เปิดรับจองโทร
+  bookingDays: 7,
   openNow: false,      // อยู่ในเวลาทำการตอนนี้หรือไม่ (รวมวันหยุด)
   hoursLabel: '',
 }
 
-export interface ShopStatus { isOpen: boolean; callsEnabled: boolean; openNow: boolean; hoursLabel: string }
+export interface ShopStatus { isOpen: boolean; callsEnabled: boolean; bookingDays: number; openNow: boolean; hoursLabel: string }
 export const setShop = (s: ShopStatus) => { Object.assign(SHOP, s) }
 
-export const BOOKING_DAYS = 7
 
 export const RELATIONSHIPS = ['โสด', 'มีแฟน', 'คุยอยู่', 'แต่งงานแล้ว', 'ไม่ระบุ']

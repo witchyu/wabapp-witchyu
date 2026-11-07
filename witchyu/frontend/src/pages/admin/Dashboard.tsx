@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarCheck, Clock, Hourglass, WalletCards } from 'lucide-react'
+import { CalendarCheck, Clock, Hourglass, WalletCards, Minus, Plus } from 'lucide-react'
 import { adminApi } from '../../services/adminApi'
 import { errorMessage } from '../../services/api'
 import { useLoad } from '../../components/admin/useLoad'
@@ -86,6 +86,35 @@ export default function Dashboard() {
             <div className="text-sm text-mute">{data.settings.shopOpen ? 'ลูกค้าจองคิวได้ตามปกติ' : 'ปิดอยู่ — ลูกค้าจองคิวไม่ได้'}</div>
           </div>
           <Toggle label="เปิดรับจองคิว" checked={data.settings.shopOpen} disabled={busy} onChange={(v) => (v ? save({ shopOpen: true }) : setAskClose(true))} />
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">ระยะเวลาเปิดจองล่วงหน้า</div>
+            <div className="text-sm text-mute">กำหนดได้ 1–7 วัน (สูงสุด 7 วัน)</div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-1.5">
+            <button
+              type="button"
+              aria-label="ลดจำนวนวันจองล่วงหน้า"
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-gold disabled:opacity-40"
+              disabled={busy || data.settings.bookingDays <= 1}
+              onClick={() => save({ bookingDays: Math.max(1, data.settings.bookingDays - 1) })}
+            >
+              <Minus size={18} />
+            </button>
+            <span className="min-w-14 text-center text-sm font-semibold tabular-nums">
+              {data.settings.bookingDays} วัน
+            </span>
+            <button
+              type="button"
+              aria-label="เพิ่มจำนวนวันจองล่วงหน้า"
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-gold disabled:opacity-40"
+              disabled={busy || data.settings.bookingDays >= 7}
+              onClick={() => save({ bookingDays: Math.min(7, data.settings.bookingDays + 1) })}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex-1">

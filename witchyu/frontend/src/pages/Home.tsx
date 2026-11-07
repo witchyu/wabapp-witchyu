@@ -1,13 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarPlus, Clock, Instagram, MessageCircle, Moon, Phone, Sparkles } from 'lucide-react'
 import { SHOP } from '../data/shop'
+import { bookingApi } from '../services/bookingApi'
+import type { DaySlots } from '../types'
 import { getServices } from '../data/services'
 import BottomSheet from '../components/BottomSheet'
+import { addDays, dateShort, dayShort, toISO } from '../utils/format'
 
 export default function Home() {
   const nav = useNavigate()
   const [contact, setContact] = useState(false)
+  const [queue, setQueue] = useState<DaySlots | null>(null)
+  const [queueError, setQueueError] = useState('')
+  const [queueLoading, setQueueLoading] = useState(true)
+
+  const todayISO = toISO(new Date())
+  const [selectedDate, setSelectedDate] = useState(todayISO)
+  const days = Array.from(
+    { length: Math.min(7, Math.max(1, SHOP.bookingDays || 7)) },
+    (_, i) => toISO(addDays(new Date(`${todayISO}T12:00:00`), i)),
+  )
+  useEffect(() => {
+    let active = true
+    setQueueLoading(true)
+    setQueueError('')
+    setQueue(null)
+    bookingApi.slots(selectedDate, [])
+      .then((data) => { if (active) setQueue(data) })
+      .catch(() => { if (active) setQueueError('ไม่สามารถโหลดสถานะคิวได้') })
+      .finally(() => { if (active) setQueueLoading(false) })
+    return () => { active = false }
+  }, [selectedDate])
   const open = SHOP.openNow
   const featured = getServices().filter((s) => s.active && s.recommended)
 
@@ -23,11 +47,59 @@ export default function Home() {
         </span>
       </header>
 
-      <section className="px-5 pt-4">
-        <p className="text-sm text-mute">สวัสดี 👋</p>
-        <h1 className="mt-1 font-display text-2xl font-semibold leading-snug">พร้อมให้ Witchyu ดูแลเรื่องของคุณวันนี้ไหม?</h1>
-      </section>
+      <section className="mx-5 mt-4 rounded-2xl border border-gold/30 bg-gradient-to-br from-raised via-surface to-night p-3 text-center">
+        <p className="text-xs text-mute">สถานะคิวประจำวัน</p>
 
+        <div className="no-scrollbar mt-3 -mx-1 flex justify-center gap-2 overflow-x-auto px-1 pb-1">
+          {days.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setSelectedDate(d)}
+              className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl ${
+                selectedDate === d ? 'bg-gold text-night' : 'bg-raised text-ink'
+              }`}
+            >
+              <span className={`text-[10px] ${selectedDate === d ? 'text-night/70' : 'text-mute'}`}>
+                {d === todayISO ? 'วันนี้' : dayShort(d)}
+              </span>
+              <span className="mt-0.5 text-xs font-semibold">{dateShort(d)}</span>
+            </button>
+          ))}
+        </div>
+
+        {queueLoading ? (
+          <p className="py-3 text-xs text-mute">กำลังโหลดสถานะคิว...</p>
+        ) : queueError ? (
+          <p className="py-3 text-xs text-bad">{queueError}</p>
+        ) : queue?.closed ? (
+          <p className="mt-2 rounded-xl bg-bad/10 px-3 py-2 text-xs text-bad">
+            {queue.reason || 'วันนี้ปิดให้บริการ'}
+          </p>
+        ) : queue?.slots.length ? (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {queue.slots.map((slot, index) => (
+              <div
+                key={slot.time}
+                className={`flex flex-col items-center justify-center rounded-lg border border-line bg-surface px-2 py-2 text-center ${
+                  queue.slots.length % 2 === 1 && index === queue.slots.length - 1
+                    ? 'col-span-2'
+                    : ''
+                }`}
+              >
+                <span className="text-xs font-semibold">{slot.time}–{slot.endTime}</span>
+                <span className={`mt-0.5 text-[11px] ${
+                  slot.status === 'available' ? 'text-ok' : 'text-mute'
+                }`}>
+                  {slot.status === 'available' ? 'ว่าง' : slot.status === 'full' ? 'เต็ม' : 'ปิด'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="py-3 text-xs text-mute">ไม่มีช่วงเวลาให้บริการวันนี้</p>
+        )}
+      </section>
       <section className="mx-5 mt-5 overflow-hidden rounded-3xl border border-gold/30 bg-gradient-to-br from-raised via-surface to-night p-5">
         <Moon className="text-gold" size={26} />
         <h2 className="mt-3 font-display text-lg font-semibold">จองคิวดูดวงได้ในไม่กี่ขั้นตอน</h2>

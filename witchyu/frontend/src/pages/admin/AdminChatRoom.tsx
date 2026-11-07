@@ -41,7 +41,8 @@ export default function AdminChatRoom() {
         role="admin"
         conv={conv}
         title={b ? `${b.customer.nickname} (${b.customer.fullName})` : 'แชต'}
-        subtitle={b ? `${b.serviceName} · ${dateShort(b.date)} ${b.time}` : undefined}
+        bookingMeta={b ? `${dateShort(b.date)} ${b.time} · ${b.id}` : undefined}
+        subtitle={b ? b.serviceName : undefined}
         avatar={<CustomerAvatar name={b?.customer.nickname ?? ''} />}
         onBack={() => nav('/admin/chat')}
         onDeleteMessage={(message) => setAskDelete(message)}

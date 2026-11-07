@@ -97,12 +97,13 @@ export function parseQueueSettingsPatch(body: unknown) {
 
   if (b.imageDesigns !== undefined) {
     const designs = object(b.imageDesigns)
-    if (Object.keys(designs).length > 366) throw bad('จำนวนวันที่บันทึกแบบภาพคิวมากเกินไป')
+    const dateKeys = Object.keys(designs).filter((key) => key !== 'default')
+    if (dateKeys.length > 366) throw bad('จำนวนวันที่บันทึกแบบภาพคิวมากเกินไป')
 
     const parsed: Record<string, Record<string, unknown>> = {}
-    for (const [date, design] of Object.entries(designs)) {
-      parseQueueDate(date)
-      parsed[date] = object(design)
+    for (const [key, design] of Object.entries(designs)) {
+      if (key !== 'default') parseQueueDate(key)
+      parsed[key] = object(design)
     }
 
     if (JSON.stringify(parsed).length > 50000) {

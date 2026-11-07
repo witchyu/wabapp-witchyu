@@ -95,6 +95,7 @@ function intervalMinutes(start: string, end: string): [number, number] {
 export function computeDaySlots(a: {
   date: string
   shopOpen: boolean
+  bookingDays: number
   now: ShopNow
   slots: SlotRow[]
   hours: HoursRow | null
@@ -129,9 +130,10 @@ export function computeDaySlots(a: {
 
   if (!a.shopOpen) return allClosed({ reasonCode: 'SHOP_CLOSED', reason: 'ขณะนี้ร้านปิดรับจองคิว' })
 
-  const last = addDaysISO(a.now.date, BOOKING_DAYS - 1)
+  const bookingDays = Math.min(7, Math.max(1, Math.floor(a.bookingDays)))
+  const last = addDaysISO(a.now.date, bookingDays - 1)
   if (a.date < a.now.date || a.date > last) {
-    return allClosed({ reasonCode: 'DATE_OUT_OF_RANGE', reason: `จองล่วงหน้าได้ ${BOOKING_DAYS} วันเท่านั้น` })
+    return allClosed({ reasonCode: 'DATE_OUT_OF_RANGE', reason: `จองล่วงหน้าได้ ${bookingDays} วันเท่านั้น` })
   }
   if (a.holiday) return allClosed({ reasonCode: 'DAY_CLOSED', reason: a.holiday.reason || 'วันหยุดร้าน' })
   if (!a.hours || a.hours.isClosed) return allClosed({ reasonCode: 'DAY_CLOSED', reason: 'ร้านปิดทำการวันนี้' })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarX } from 'lucide-react'
 import { useBooking } from '../../hooks/useBooking'
-import { BOOKING_DAYS } from '../../data/shop'
+import { SHOP } from '../../data/shop'
 import { addDays, dateShort, dayShort, toISO } from '../../utils/format'
 import { bookingApi } from '../../services/bookingApi'
 import { errorMessage } from '../../services/api'
@@ -19,7 +19,7 @@ export default function StepDateTime() {
   const { draft, patchDraft } = useBooking()
 
   const days = useMemo(
-    () => Array.from({ length: BOOKING_DAYS }, (_, i) => toISO(addDays(new Date(), i))),
+    () => Array.from({ length: SHOP.bookingDays }, (_, i) => toISO(addDays(new Date(), i))),
     [],
   )
   const today = days[0]
@@ -61,7 +61,7 @@ export default function StepDateTime() {
   return (
     <div>
       <h3 className="mb-2 text-sm text-mute">
-        เลือกวัน (จองล่วงหน้าได้ {BOOKING_DAYS} วัน)
+        เลือกวัน (จองล่วงหน้าได้ {SHOP.bookingDays} วัน)
       </h3>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-2">

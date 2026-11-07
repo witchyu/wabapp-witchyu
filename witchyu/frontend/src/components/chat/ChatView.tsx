@@ -11,6 +11,7 @@ interface Props {
   conv: Conv
   title: string
   subtitle?: string
+  bookingMeta?: string
   avatar: ReactNode
   onBack: () => void
   onDeleteMessage?: (message: import('../../types/chat').ChatMessage) => void
@@ -57,7 +58,7 @@ function useVisibleViewport(): VisibleViewport | null {
   return viewport
 }
 
-export default function ChatView({ role, conv, title, subtitle, avatar, onBack, onDeleteMessage }: Props) {
+export default function ChatView({ role, conv, title, subtitle, bookingMeta, avatar, onBack, onDeleteMessage }: Props) {
   const { messages, status, error, reload, hasMore, loadingOlder, loadOlder, canSend, cannotSendReason, send, retry, notifyTyping, peerTyping, sendError, clearSendError, connected, peerOnline } = conv
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -124,11 +125,14 @@ export default function ChatView({ role, conv, title, subtitle, avatar, onBack, 
         <button onClick={onBack} aria-label="ย้อนกลับ" className="grid h-11 w-11 place-items-center rounded-full active:bg-raised"><ChevronLeft size={24} /></button>
         {avatar}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-base font-semibold leading-tight">{title}</h1>
-          <div className="flex items-center gap-1.5 text-xs text-mute">
-            <span className={`h-2 w-2 rounded-full ${peerOnline ? 'bg-ok' : 'bg-mute/50'}`} />
-            <span>{peerOnline ? 'ออนไลน์' : 'ออฟไลน์'}</span>
-            {subtitle && <span className="truncate">· {subtitle}</span>}
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="min-w-0 truncate font-display text-base font-semibold leading-tight">{title}</h1>
+            {bookingMeta && <span className="min-w-0 truncate whitespace-nowrap text-[11px] text-mute">{bookingMeta}</span>}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-mute">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${peerOnline ? 'bg-ok' : 'bg-mute/50'}`} />
+            <span className="shrink-0">{peerOnline ? 'ออนไลน์' : 'ออฟไลน์'}</span>
+            {subtitle && <span className="min-w-0 truncate whitespace-nowrap text-ellipsis">· {subtitle}</span>}
           </div>
         </div>
       </header>
@@ -172,9 +176,9 @@ export default function ChatView({ role, conv, title, subtitle, avatar, onBack, 
               return (
                 <div key={m.clientMsgId ?? m.id}>
                   {sep && <div className="my-3 text-center text-xs text-mute">{sep}</div>}
-                  <div className={`mb-2 flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`flex max-w-[82%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                      <div className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed shadow-sm ${mine ? 'rounded-br-md bg-gold text-night' : 'rounded-bl-md bg-raised text-ink'} ${m.local ? 'opacity-70' : ''}`}>{m.body}</div>
+                  <div className={`mb-2 flex min-w-0 max-w-full ${mine ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex min-w-0 max-w-[min(82%,calc(100vw-2rem))] flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                      <div className={`max-w-full [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed shadow-sm ${mine ? 'rounded-br-md bg-gold text-night' : 'rounded-bl-md bg-raised text-ink'} ${m.local ? 'opacity-70' : ''}`}>{m.body}</div>
                       {role === 'admin' && !m.local && onDeleteMessage && (
                         <button
                           type="button"

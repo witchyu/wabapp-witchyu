@@ -488,6 +488,7 @@ export const getSettings = () => readSettings(prisma)
 export async function updateSettings(patch: {
   shopOpen?: boolean
   callsEnabled?: boolean
+  bookingDays?: number
   customerDataRetentionDays?: number
   bookingRetentionDays?: number
   chatRetentionDays?: number
@@ -501,6 +502,7 @@ export async function updateSettings(patch: {
       id: 1,
       shopOpen: patch.shopOpen ?? true,
       callsEnabled: patch.callsEnabled ?? true,
+      bookingDays: patch.bookingDays ?? 7,
       customerDataRetentionDays: patch.customerDataRetentionDays ?? 30,
       bookingRetentionDays: patch.bookingRetentionDays ?? 30,
       chatRetentionDays: patch.chatRetentionDays ?? 10,

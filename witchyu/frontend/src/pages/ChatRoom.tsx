@@ -19,7 +19,8 @@ export default function ChatRoom() {
       role="customer"
       conv={conv}
       title="Witchyu · หมอดู"
-      subtitle={b ? `${b.serviceName} · ${dateShort(b.date)} ${b.time}` : undefined}
+      bookingMeta={b ? `${dateShort(b.date)} ${b.time} · ${b.id}` : undefined}
+      subtitle={b ? b.serviceName : undefined}
       avatar={<DoctorAvatar />}
       onBack={() => nav('/chat')}
     />
